@@ -2,6 +2,11 @@
 
 ## Advanced Building Heat Pump Control Testing Framework
 
+This project features a light-weight Python-based thermal simulation framework for heat pump operation in buildings. It is particularly useful for the following tasks:
+- Serves as evaluation framework for testing different building heat pump control strategies
+- Features different detailed reduced-order models for implementing building heat pump controllers (e.g., MPC)
+- Serves as synthetic data generation framework, e.g. for ML-based controllers or anomaly detection
+
 This Python project facilitates the quick generation of reduced order building models. It features a simulator class providing a high-level interface for one-step and multi-step simulations. These simulations return the next state(s) of the building (temperatures), indicators for comfort levels, and energy demand. This interface can be used to evaluate and test different control strategies. Interface to RL, MPC, and reference heat curve controller is provided. Implementation for MPC and reference heat curve is given. The project includes simple heat pump models based on performance curves for heating systems, and disturbance profiles for ambient temperature, internal heat gains by occupancy, and solar heat gains.
 
 ![I4C_Grafik](https://github.com/lfrison/i4b/assets/104891971/65cce2cf-8801-45ba-811d-a965a0115c08)
