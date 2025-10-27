@@ -1,13 +1,10 @@
-from typing import Tuple, Union
+from typing import Dict, List, Tuple
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
-from scipy.integrate import odeint
 import models.model_hvac as model_hvac
 from simulator import Model_simulator
-import Utilities as util 
 from models.model_buildings import Building
-import scipy.stats as stats
 from gym_interface import BUILDING_NAMES2CLASS
 import pandas as pd
 from gym_interface.constant import OBSERVATION_SPACE_LIMIT
@@ -16,22 +13,35 @@ from disturbances import load_weather, get_solar_gains, get_int_gains
 
 
 class RoomHeatEnv(gym.Env):   
-    """ Convert the I4B simulation environment to Gymnasium fasion
+    """Gymnasium environment for room heating control using the i4b simulator.
+
+    This environment exposes a heat-pump controlled building thermal model to
+    RL agents. The action is a normalized setpoint for supply flow temperature
+    in the range [-1, 1], mapped to a physical range [action_low=20,
+    action_high=65] in degrees Celsius.
+    Observations contain the building states and current disturbances 
+    (ambient temperature and total gains), with optional weather
+    forecasts appended.
+
+    Episode termination uses standard Gymnasium semantics:
+    - terminated: always False (no terminal states by default)
+    - truncated: True if the configured horizon is reached
+
+    Note: Cost metrics (comfort deviations, energy use) are reported via the
+    info dictionary for logging/evaluation, not as a separate return item.
     """
     def __init__(self,
-        hp_model,
-        building,
-        method,
-        mdot_HP,
-        internal_gain_profile,
-        # weather_profile,
-        # weather_forecast_profile,
-        weather_forecast_steps: list = [],
+        hp_model: str,
+        building: str,
+        method: str,
+        mdot_HP: float,
+        internal_gain_profile: str,
+        weather_forecast_steps: List[int] = [],
         grid_profile: str = None,
-        cost_dim : int = 1,
+        cost_dim: int = 1,
         # Simulation parameters
-        timestep : int = 3600,
-        days : int = None,
+        timestep: int = 3600,
+        days: int = None,
         random_init: bool = False,
         action_deviation_factor: float = 10,
         dev_sum_weight: float = 100,
@@ -42,8 +52,43 @@ class RoomHeatEnv(gym.Env):
         # TODO: allow flexible goal
         goal_constraint_limit: float = None,
     ):
-        """This model implements a OpenAI gym wrapper for a Room temperature simulator.
-        """    
+        """Initialize the RoomHeatEnv.
+
+        Parameters
+        ----------
+        hp_model : str
+            Name of the heat pump model class in `models.model_hvac`.
+        building : str
+            Key in `gym_interface.BUILDING_NAMES2CLASS` selecting building params.
+        method : str
+            Building model structure, e.g., '4R3C'.
+        mdot_HP : float
+            Mass flow rate of the heat supply system in kg/s.
+        internal_gain_profile : str
+            Relative path to internal gains profile CSV under the repo root.
+        weather_forecast_steps : List[int]
+            Steps ahead (in multiples of timestep) to append T_amb forecasts.
+        grid_profile : str
+            Optional grid price/signal profile name (unused for now).
+        cost_dim : int
+            If 1, only log dev_neg_max; if 2, also log dev_neg_sum and a bool flag.
+        timestep : int
+            Sampling interval in seconds.
+        days : int
+            Episode length in days. If None, uses full available length.
+        random_init : bool
+            Whether to randomize initial state and start index.
+        action_deviation_factor, dev_sum_weight, dev_max_weight : float
+            Weights for custom reward shaping (reserved).
+        reward_function_idx : int
+            Selector for reward function variants (reserved).
+        goal_based : bool
+            If True, enables goal-constraint logic (reserved).
+        noise_level : float
+            Standard deviation of Gaussian noise added to observations.
+        goal_constraint_limit : float
+            Non-negative constraint limit if goal_based is True.
+        """
         super(RoomHeatEnv, self).__init__()
 
         self.timestep = timestep # sampling interval in s
@@ -67,12 +112,12 @@ class RoomHeatEnv(gym.Env):
         )
         
         self.action_space = spaces.Box(
-            low = (-1), # TODO: get the minimal action/heat pump temperature
+            low = (-1),
             high = (1),
             shape = (1,),
             dtype = np.float32
         )
-        # TODO: Now action space normalized to (-1, 1)
+        # Action space normalized to (-1, 1) mapped to [action_low, action_high]
         self.action_low = 20
         self.action_high = 65
 
@@ -88,9 +133,9 @@ class RoomHeatEnv(gym.Env):
         # self.T_amb = weather_data
         # Generate absolut heat gain profiles, based on datetime, building usage and floor area. 
         self.internal_gains_df = get_int_gains(
-            time = self.weather_data.index,
-            profile_path = os.path.join(parent_dir, internal_gain_profile),
-            bldg_area = self.building['area_floor'])
+            time=self.weather_data.index,
+            profile_path=os.path.join(parent_dir, internal_gain_profile),
+            bldg_area=self.building['area_floor'])
         Qdot_sol = get_solar_gains(weather = self.weather_data, bldg_params = self.building)
         Qdot_gains = pd.DataFrame(Qdot_sol + self.internal_gains_df['Qdot_tot'] , columns = ['Qdot_gains']) # calculate total gains
         self.p = pd.concat([self.weather_data['T_amb'], Qdot_gains], axis = 1).astype(np.float32).resample(f'{timestep}s').ffill() # Disturbances
@@ -136,7 +181,7 @@ class RoomHeatEnv(gym.Env):
             )
         self.days = days
         self._cur_steps = 0
-        max_t = days * 24 * int(3600 / self.timestep)
+        max_t = None if days is None else days * 24 * int(3600 / self.timestep)
         if max_t is not None:
             assert max_t < len(self.p), \
                 "Maximaum timesteps (%d) is larger than the length (%d) of the ambient temperature" \
@@ -156,7 +201,7 @@ class RoomHeatEnv(gym.Env):
         self.reward_function_idx = reward_function_idx
         self.reset()
 
-    def reset_env(self, building, mdot_HP, hp_model, weather_profile, internal_gain_profile, weather_forecast_profile):
+    def reset_env(self, building: Dict, mdot_HP: float, hp_model: str, weather_profile: pd.DataFrame, internal_gain_profile: str, weather_forecast_profile: pd.DataFrame):
         self.building = building
         self.bldg_model = Building(params = self.building, # More example buildings can be found in data/buildings/.
                                   mdot_hp = mdot_HP,       # Massflow of the heat supply system. [kg/s]
@@ -171,9 +216,9 @@ class RoomHeatEnv(gym.Env):
         self.weather_data = weather_profile
         # Generate absolut heat gain profiles, based on datetime, building usage and floor area. 
         self.internal_gains_df = get_int_gains(
-            time = self.weather_data.index,
-            profile = internal_gain_profile,
-            bldg_area = self.building['area_floor'])
+            time=self.weather_data.index,
+            profile_path=internal_gain_profile,
+            bldg_area=self.building['area_floor'])
         Qdot_sol = get_solar_gains(weather = self.weather_data, bldg_params = self.building)
         Qdot_gains = pd.DataFrame(Qdot_sol + self.internal_gains_df['Qdot_tot'] , columns = ['Qdot_gains']) # calculate total gains
         self.p = pd.concat([self.weather_data['T_amb'], Qdot_gains], axis = 1).astype(np.float32).resample(f'{self.timestep}S').pad() # Disturbances
@@ -182,69 +227,68 @@ class RoomHeatEnv(gym.Env):
         self.weather_forecast_data = weather_forecast_profile
         self.reset()
 
-    def get_obs(self):
+    def get_obs(self) -> np.ndarray:
+        """Return a copy of the current observation vector."""
         return self.state.copy()
     
-    def get_cur_T_amb(self):
-        return self.p.iloc[self.t]['T_amb']
+    def get_cur_T_amb(self) -> float:
+        """Get current ambient temperature in degC."""
+        return float(self.p.iloc[self.t]['T_amb'])
     
-    def get_cur_Qdot_gains(self):
-        return self.p.iloc[self.t]['Qdot_gains']
+    def get_cur_Qdot_gains(self) -> float:
+        """Get current total heat gains in W."""
+        return float(self.p.iloc[self.t]['Qdot_gains'])
 
-    def get_building_info(self):
-        # which building, heat pump type and mass flow rate
+    def get_building_info(self) -> Tuple[str, str, float]:
+        """Return (hp_model_name, building_name, mass_flow_rate)."""
         return (self.hp_model_name, self.bldg_model.params['name'], self.bldg_model.mdot_hp)
 
     def get_cur_time(self):
+        """Return current pandas timestamp from disturbances index."""
         return self.p.index[self.t]
 
     def get_info_wt(self):
-        # return T (n_day of the year), H (hour of the day), W (if it's a weekday or weekend day)
+        """Return tuple of (current_time, hp_model_name, building_name, mass_flow_rate)."""
         return (self.get_cur_time(), *self.get_building_info())
 
-    def get_cur_p(self):
+    def get_cur_p(self) -> Dict:
+        """Return current disturbances as a dict (T_amb, Qdot_gains)."""
         return self.p.iloc[self.t].to_dict()
 
-    def get_cur_weather_forecast(self):
-        return [self.p.iloc[self.t + i]['T_amb'] for i in self.weather_forecast_steps]
+    def get_cur_weather_forecast(self) -> List[float]:
+        """Return list of ambient temperature forecasts for configured steps."""
+        return [float(self.p.iloc[self.t + i]['T_amb']) for i in self.weather_forecast_steps]
     
-    def get_p_by_t(self, t):
+    def get_p_by_t(self, t: int) -> Dict:
+        """Return disturbances at index t as a dict."""
         return self.p.iloc[t].to_dict()
 
     def _reward_func(self,
         action_deviation: np.ndarray,
-        costs: dict
+        costs: Dict
     ) -> float:
-        """Customized reward function for Room Temperature Simulation
+        """Compute scalar reward.
 
-        Args:
-            prev_obs (np.ndarray): previous observation
-            cur_obs (np.ndarray): current observation
-            u (np.ndarray): control action
-            action_deviation (np.ndarry): control diviation from the last action
-            Q_el (float): used HP electricity [kWh]
-            deviation (tuple):
-                dev_sum_neg (float): absolute room temperature comfort deviation from the lower bound (21 degrees) hourly on average [Kh]
-                dev_max_neg (float): absolute maximal room temperature comfort deviation from the lower bound (21 degrees) [K]
-                dev_sum_pos (float): absolute room temperature comfort deviation hourly from the high bound (26 degrees) on average [Kh]
-                dev_max_pos (float): absolute maximal room temperature comfort deviation from the high bound (26 degrees) [K]
-    
-        Returns:
-            reward (float): received reward sigmal
+        Currently returns negative electricity consumption (kWh) to minimize energy use.
         """
-        dev_sum, dev_max = costs['dev_neg_sum'], costs['dev_neg_max']
-        Q_el = costs['E_el']
-
-        return - Q_el
+        Q_el_kWh = costs['E_el']
+        return -float(Q_el_kWh)
 
     
-    def restore_action(self, a):
+    def restore_action(self, a: np.ndarray) -> np.ndarray:
+        """Map normalized action in [-1, 1] to physical setpoint in [low, high]."""
         return a * (self.action_high - self.action_low) / 2 + (self.action_low + self.action_high) / 2
 
-    def normalize_action(self, a):
+    def normalize_action(self, a: np.ndarray) -> np.ndarray:
+        """Map physical setpoint to normalized action in [-1, 1]."""
         return (a - (self.action_low + self.action_high) / 2) * 2 / (self.action_high - self.action_low)
 
-    def step(self, a):
+    def step(self, a: np.ndarray):
+        """Advance the simulation by one step.
+
+        Returns (obs, reward, terminated, truncated, info) following Gymnasium API.
+        Cost/comfort metrics are included in info.
+        """
         prev_obs = self.get_obs()
         pk = self.get_cur_p()
         
@@ -271,7 +315,7 @@ class RoomHeatEnv(gym.Env):
         self.prev_action = T_hp_sup_set.copy()
         res = self.simulator.get_next_state(x_init, T_hp_sup_set, pk)
         next_state, costs = res['state'], res['cost']
-        # convert to kwh
+        # convert electricity use to kWh
         costs['E_el'] = costs['E_el'] / 1000
         self.t += 1
 
@@ -279,31 +323,25 @@ class RoomHeatEnv(gym.Env):
         self.state[self.obs_len:self.obs_len+len(self.p_keys)] = [pk[key] for key in self.p_keys]
         self.state[self.obs_len+len(self.p_keys):self.obs_len+len(self.p_keys)+len(self.weather_forecast_steps)] = self.get_cur_weather_forecast()
 
-        reward = self._reward_func(action_deviation, costs).item()
+        reward = self._reward_func(action_deviation, costs)
         self._cur_steps += 1
-        if self.cost_dim == 1:
-            cost = costs["dev_neg_max"].item()
-        elif self.cost_dim == 2:
-            # cost = [costs["dev_neg_sum"].item(), costs["dev_neg_max"].item()]
-            cost = [costs["dev_neg_sum"].item(), costs["dev_neg_max"].item() > 0.01] # 0.01 is the tolerance threshold
-        return (
-            self.state.copy() + np.random.normal(0, self.noise_level, self.state.shape),
-            reward,
-            cost,
-            False,
-            True if self.t >= len(self.p) - 1  or self._cur_steps >= self.max_t else False,
-            {
-                "cost" : cost,
-                "Q_el"    : costs["E_el"].item() / 1000,
-                "dev_sum" : costs["dev_neg_sum"].item(),
-                "dev_max" : costs["dev_neg_max"].item(),
-                "t" : self.t,
-                "u" : T_hp_sup_set
-            },
-        )
+        truncated = True if self.t >= len(self.p) - 1 or self._cur_steps >= self.max_t else False
+        info = {
+            "Q_el_kWh": float(costs["E_el"]),
+            "dev_sum": float(costs["dev_neg_sum"]),
+            "dev_max": float(costs["dev_neg_max"]),
+            "t": int(self.t),
+            "u": float(T_hp_sup_set),
+        }
+        if self.cost_dim == 2:
+            info["dev_sum_hourly"] = float(costs["dev_neg_sum"])  # alias for clarity
+            info["comfort_violated"] = bool(costs["dev_neg_max"] > 0.01)
+
+        obs = self.state.copy() + np.random.normal(0, self.noise_level, self.state.shape)
+        return obs, float(reward), False, truncated, info
 
     def reset(self, seed=None, **kwargs):
-        # self.seed(seed)
+        """Reset the environment and return the initial observation and info."""
         super().reset(seed=seed)
         if self.random_init:
             if len(self.weather_forecast_steps) > 0:
@@ -318,7 +356,7 @@ class RoomHeatEnv(gym.Env):
         self._cur_steps = 0
         return self.state.copy(), {}
     
-    def create_init_state(self, t=0, date=None):
+    def create_init_state(self, t: int = 0, date=None) -> np.ndarray:
         if self.random_init:
             init_state = np.random.uniform(self.obs_lim_low, self.obs_lim_high).astype(np.float32)
         else:

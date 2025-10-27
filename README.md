@@ -12,9 +12,11 @@ This Python project facilitates the quick generation of reduced order building m
 2. [Building Model](#building-models)
 3. [Disturbances](#disturbances)
 4. [Controller](#controller)
-5. [Usage](#usage)
-6. [License](#license)
-7. [Acknowledgements](#acknowledgements)
+5. [Gymnasium Interface (RL)](#gymnasium-interface-rl)
+6. [Training with Stable-Baselines3](#training-with-stable-baselines3)
+7. [Evaluation](#evaluation)
+8. [License](#license)
+9. [Acknowledgements](#acknowledgements)
 
 ## Install Dependencies
 
@@ -27,7 +29,11 @@ Ensure you have the following dependencies installed:
 
 You can install these dependencies using pip:
 
-`pip install numpy pandas pvlib casadi`
+`pip install -r requirements.txt`
+
+For reinforcement learning examples and tools, install the optional extras:
+
+`pip install -r requirements-rl.txt`
 
 ## Building Models
 
@@ -76,11 +82,85 @@ To manually generate disturbance profiles, start with the weather data and give 
 ## Controller
 
 Heating curves are a widely used approach to control heating temperatures based on outdoor temperature to maintain constant room temperature. In this framework, the heating curve controller can be used as a baseline.
-MPC controller using [CasADi](https://web.casadi.org/is available).
-Interface to RL controller.
+MPC controller using [CasADi](https://web.casadi.org/) is available.
+Gymnasium-compatible RL interface is provided (see below).
 
 ![i4c-cntroller](https://github.com/lfrison/i4b/assets/104891971/87e45eff-9fea-4771-a8bc-ead693e322ee)
 
+## Gymnasium Interface (RL)
+
+The module `src/gym_interface/room_env.py` exposes the building thermal simulation as a Gymnasium environment `RoomHeatEnv`. A convenience factory and registration helpers are provided in `src/gym_interface/__init__.py`.
+
+- **Action space**: `Box([-1], [1])` (normalized). Mapped to supply flow temperature setpoint in °C within `[action_low, action_high]`.
+- **Observation**: Building state vector + current `T_amb`, `Qdot_gains` and optional future `T_amb` forecasts.
+- **API**: Returns `(obs, reward, terminated, truncated, info)` following Gymnasium.
+
+Quickstart (Python):
+
+```python
+from gym_interface import make_room_heat_env
+
+env = make_room_heat_env(
+    building='sfh_2016_now_0_soc',
+    hp_model='HPbasic',
+    method='4R3C',
+    mdot_HP=0.25,
+    internal_gain_profile='data/profiles/InternalGains/ResidentialDetached.csv',
+    weather_forecast_steps=[],  # e.g., [1,2,3] to append future T_amb steps
+    timestep=3600,
+    days=30,
+    random_init=False,
+    noise_level=0.0,
+)
+
+obs, info = env.reset()
+for _ in range(100):
+    action = env.action_space.sample()
+    obs, reward, terminated, truncated, info = env.step(action)
+    if terminated or truncated:
+        break
+```
+
+Direct instantiation (advanced users) is also supported by importing `RoomHeatEnv` and passing explicit constructor args.
+
+## Training with Stable-Baselines3
+
+We provide a minimal PPO training script:
+
+```bash
+python examples/train_sb3_ppo.py \
+  --building sfh_2016_now_0_soc \
+  --hp_model HPbasic \
+  --method 4R3C \
+  --mdot_hp 0.25 \
+  --internal_gain_profile data/profiles/InternalGains/ResidentialDetached.csv \
+  --timestep 3600 \
+  --days 30 \
+  --total_timesteps 200000 \
+  --logdir runs/ppo_roomheat
+```
+
+Notes:
+- Install RL extras first: `pip install -r requirements-rl.txt`.
+- Adjust `--forecast` to include simple ambient temperature forecasts.
+
+## Evaluation
+
+Evaluate a saved PPO policy:
+
+```bash
+python examples/eval_sb3_policy.py \
+  --building sfh_2016_now_0_soc \
+  --hp_model HPbasic \
+  --method 4R3C \
+  --mdot_hp 0.25 \
+  --internal_gain_profile data/profiles/InternalGains/ResidentialDetached.csv \
+  --timestep 3600 \
+  --days 30 \
+  --model_path runs/ppo_roomheat/ppo_roomheat.zip
+```
+
+The script reports average return and total electricity use (kWh) across episodes.
 
 ## License
 

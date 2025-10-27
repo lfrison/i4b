@@ -1,2 +1,7 @@
-casadi==3.5.5
+casadi==3.7.2
 pvlib==0.9.0
+numpy==2.2.6
+pandas==2.3.3
+gymnasium==1.2.1
+scipy==1.15.0
+matplotlib==3.10.7
