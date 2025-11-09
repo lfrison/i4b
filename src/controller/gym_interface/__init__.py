@@ -87,7 +87,7 @@ OBSERVATION_SPACE_LIMIT = {
     'T_amb': (-25, 45),
     'T_forecast' : (-25, 45),
     'Qdot_gains': (0, 8000),
-    'goal_constraint' : (0, 3),
+    'goal_temperature': (15, 30),
 }
 
 import sys, os

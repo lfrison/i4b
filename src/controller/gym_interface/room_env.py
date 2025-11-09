@@ -21,7 +21,7 @@ OBSERVATION_SPACE_LIMIT = {
     'T_amb': (-25, 45),
     'T_forecast' : (-25, 45),
     'Qdot_gains': (0, 8000),
-    'goal_constraint' : (0, 3),
+    'goal_temperature': (15, 30),
 }
 
 class RoomHeatEnv(gym.Env):   
@@ -48,8 +48,6 @@ class RoomHeatEnv(gym.Env):
         reward_function_idx: int = 0,
         goal_based: bool = False,
         noise_level: float = 0.0,
-        # TODO: allow flexible goal
-        goal_constraint_limit: float = None,
     ):
         """This model implements a OpenAI gym wrapper for a Room temperature simulator.
         """    
@@ -109,7 +107,6 @@ class RoomHeatEnv(gym.Env):
         self.dev_max_weight = dev_max_weight
         
         self.goal_based = goal_based
-        self.goal_constraint_limit = goal_constraint_limit
         
         self.obs_keys = self.bldg_model.state_keys
         self.p_keys = ["T_amb", "Qdot_gains"]
@@ -158,9 +155,6 @@ class RoomHeatEnv(gym.Env):
         self.cur_action = None
         self.prev_action = None
         self.random_init = random_init
-
-        if goal_constraint_limit is not None and goal_based:
-            assert goal_constraint_limit >= 0, "Goal constraint limit must be positive"
         
         self.reward_function_idx = reward_function_idx
         self.reset()
@@ -185,7 +179,7 @@ class RoomHeatEnv(gym.Env):
             bldg_area = self.building['area_floor'])
         Qdot_sol = get_solar_gains(weather = self.weather_data, bldg_params = self.building)
         Qdot_gains = pd.DataFrame(Qdot_sol + self.internal_gains_df['Qdot_tot'] , columns = ['Qdot_gains']) # calculate total gains
-        self.p = pd.concat([self.weather_data['T_amb'], Qdot_gains], axis = 1).astype(np.float32).resample(f'{self.timestep}S').pad() # Disturbances
+        self.p = pd.concat([self.weather_data['T_amb'], Qdot_gains], axis = 1).astype(np.float32).resample(f'{self.timestep}s').ffill() # Disturbances
         self.hp_model_name = hp_model
 
         self.weather_forecast_data = weather_forecast_profile

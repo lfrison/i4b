@@ -14,7 +14,7 @@ Construction period 2010 - 2015
 sfh_2010_2015_0_soc = {'H_ve': 95,            # [W/K]
                        'H_tr': 194,           # [W/K]
                        'H_tr_light' : 54.6 + 4.7, # [W/K]
-                       'c_bldg': 45,          # [Wh/(m^2K)] Mauerwerk mit Wärmedämmverbundsystem - mittel nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 45,          # [Wh/(m^2K)] Masonry with ETICS - medium (Mauerwerk mit Wärmedämmverbundsystem - mittel) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 186.8,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_2010_2015_0_soc'}
@@ -49,7 +49,7 @@ sfh_2010_2015_0_soc['position'] = {'lat': 48.0252,
 sfh_2010_2015_1_enev = {'H_ve': 79,            # [W/K]
                         'H_tr': 164,           # [W/K]
                         'H_tr_light' : 54.6 + 4.7, # [W/K]
-                        'c_bldg': 45,          # [Wh/(m^2K)] Mauerwerk mit Wärmedämmverbundsystem - mittel nach DIN EN ISO 13790 - Tabelle 12
+                        'c_bldg': 45,          # [Wh/(m^2K)] Masonry with ETICS - medium (Mauerwerk mit Wärmedämmverbundsystem - mittel) according to DIN EN ISO 13790 - Table 12
                         'area_floor': 186.8,   # [m^2]
                         'height_room': 2.5,    # [m]
                         'name': 'sfh_2010_2015_1_enev'}
@@ -84,7 +84,7 @@ sfh_2010_2015_1_enev['position'] = {'lat': 48.0252,
 sfh_2010_2015_2_kfw = {'H_ve': 71,            # [W/K]
                        'H_tr': 89,            # [W/K]
                        'H_tr_light' : 29.4 + 2.1, # [W/K]
-                       'c_bldg': 45,          # [Wh/(m^2K)] Mauerwerk mit Wärmedämmverbundsystem - mittel nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 45,          # [Wh/(m^2K)] Masonry with ETICS - medium (Mauerwerk mit Wärmedämmverbundsystem - mittel) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 186.8,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_2010_2015_2_kfw'}

@@ -14,7 +14,7 @@ Construction period 1969 - 1978
 sfh_1969_1978_0_soc = {'H_ve': 88,            # [W/K]
                        'H_tr': 493,           # [W/K]
                        'H_tr_light' : 95.8 + 6, # [W/K]
-                       'c_bldg': 45,          # [Wh/(m^2K)] Mauerwerk - mittel nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 45,          # [Wh/(m^2K)] Masonry - medium (Mauerwerk - mittel) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 173.2,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_1969_1978_0_soc'}
@@ -49,7 +49,7 @@ sfh_1969_1978_0_soc['position'] = {'lat': 48.0252,
 sfh_1969_1978_1_enev = {'H_ve': 88,            # [W/K]
                         'H_tr': 198,           # [W/K]
                         'H_tr_light' : 44.5 + 2.6, # [W/K]
-                        'c_bldg': 45,          # [Wh/(m^2K)] Mauerwerk - mittel nach DIN EN ISO 13790 - Tabelle 12
+                        'c_bldg': 45,          # [Wh/(m^2K)] Masonry - medium (Mauerwerk - mittel) according to DIN EN ISO 13790 - Table 12
                         'area_floor': 173.2,   # [m^2]
                         'height_room': 2.5,    # [m]
                         'name': 'sfh_1969_1978_1_enev'}
@@ -84,7 +84,7 @@ sfh_1969_1978_1_enev['position'] = {'lat': 48.0252,
 sfh_1969_1978_2_kfw = {'H_ve': 74,            # [W/K]
                        'H_tr': 113,           # [W/K]
                        'H_tr_light' : 27.4 + 1.6, # [W/K]
-                       'c_bldg': 45,          # [Wh/(m^2K)] Mauerwerk - mittel nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 45,          # [Wh/(m^2K)] Masonry - medium (Mauerwerk - mittel) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 173.2,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_1969_1978_2_kfw'}

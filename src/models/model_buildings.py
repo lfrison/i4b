@@ -23,7 +23,7 @@ h_tr_int   = 9.1      # [W/(m^2K)] heattransfer coefficient between building mas
 h_air2surf = 3.45     # [W/(m^2K)] heattransfer coefficient between indoor surface and indoor air ISO13790 7.2.2.2
 c_P_screed = 1000 # specific heat capacity of screed [J/(kgK)] source: https://www.schweizer-fn.de/stoff/wkapazitaet/wkapazitaet_baustoff_erde.php
 d_screed = 50     # thickness of screed for UFH [mm] source: https://www.kesselheld.de/heizestrich/
-rho_screed = 2000 # dry bulk density of screed (Trockenrohdichte) [kg/m^3] source: https://www.profibaustoffe.com/wp-content/files/TD_2059_2056_ESTRICH-CT-C20-F4-E225-MIT-FASERN_041119.pdf
+rho_screed = 2000 # dry bulk density of screed (original German: Trockenrohdichte) [kg/m^3] source: https://www.profibaustoffe.com/wp-content/files/TD_2059_2056_ESTRICH-CT-C20-F4-E225-MIT-FASERN_041119.pdf
 
 
 class Building:
@@ -46,14 +46,14 @@ class Building:
         - C_INT_SPEC = 10000 J/m^2/K    : Spec heat capacitiy of interior acc. to ISO52016 Tab. B17
         - H_UFH_SPEC = 4.4 W/m^2/K      : Spec heat transmission coefficient for underfloor heating acc. to `Daniel Rüdiser <https://www.htflux.com/en/dynamic-simulation-and-comparison-of-two-underfloor-heating-systems/>`_
         - H_UFH_SURF_SPEC = 10.8 W/m^2/K : Spec heat convection from floor to air with underfloor heating system acc to EN 1264-5
-        - V_TS_SPEC = 5 l/m^2           : Spec volume of thermal heat storage per heated floor area acc. to DGS – Deutsche Gesellschaft für Sonnenenergie. Leitfaden Solarthermische Anlagen – Experten-Vortrag auf DVD, 9. Auflage
+        - V_TS_SPEC = 5 l/m^2           : Spec volume of thermal heat storage per heated floor area acc. to DGS – German Society for Solar Energy (original German: Deutsche Gesellschaft für Sonnenenergie). Guide to Solar Thermal Systems – Expert Presentation on DVD, 9th Edition (original German: Leitfaden Solarthermische Anlagen – Experten-Vortrag auf DVD, 9. Auflage)
         - V_UFH_SPEC = 1.5 l/m^2        : Spec volume of water in underfloor heating system per heated floor area acc. to `BaCoGa Technik GmBH <https://www.bacoga.com/wp-content/uploads/2013/02/Volumenberechnung.pdf>`_
         - R_SI = 0.13 m^2*K/W           : Heat resistance of internal surfaces acc. to DIN EN ISO 6946 Tabelle 7. 
         - h_tr_int = 9.1 W/(m^2K)       : Heattransfer coefficient between building mass and indoor surface ISO13790 12.2.2
         - h_air2surf = 3.45 W/(m^2K)    : Heattransfer coefficient between indoor surface and indoor air ISO13790 7.2.2.2
         - c_P_screed = 1000 # specific heat capacity of screed [J/(kgK)] source: https://www.schweizer-fn.de/stoff/wkapazitaet/wkapazitaet_baustoff_erde.php
         - d_screed = 50     # thickness of screed for UFH [mm] source: https://www.kesselheld.de/heizestrich/
-        - rho_screed = 2000 # dry bulk density of screed (Trockenrohdichte) [kg/m^3] source: https://www.profibaustoffe.com/wp-content/files/TD_2059_2056_ESTRICH-CT-C20-F4-E225-MIT-FASERN_041119.pdf
+        - rho_screed = 2000 # dry bulk density of screed (original German: Trockenrohdichte) [kg/m^3] source: https://www.profibaustoffe.com/wp-content/files/TD_2059_2056_ESTRICH-CT-C20-F4-E225-MIT-FASERN_041119.pdf
 
     Attributes
     ----------

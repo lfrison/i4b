@@ -10,11 +10,11 @@ Construction period 1979 - 1983
 # TABULA source DE.N.SFH.07.Gen.ReEx.001.001
 # ------------------------------------------------------------
 
-# Geometry and meterial properties
+# Geometry and material properties
 sfh_1979_1983_0_soc = {'H_ve': 110,           # [W/K]
                        'H_tr': 364,           # [W/K]
                        'H_tr_light' : 116.1 + 6, # [W/K]
-                       'c_bldg': 30,          # [Wh/(m^2K)] Leicht-Hohlziegel - leicht nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 30,          # [Wh/(m^2K)] Light hollow brick - light (Leicht-Hohlziegel - leicht) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 215.6,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_1979_1983_0_soc'}
@@ -45,11 +45,11 @@ sfh_1979_1983_0_soc['position'] = {'lat': 48.0252,
 # TABULA source DE.N.SFH.07.Gen.ReEx.001.002
 # ------------------------------------------------------------
 
-# Geometry and meterial properties
+# Geometry and material properties
 sfh_1979_1983_1_enev = {'H_ve': 110,           # [W/K]
                         'H_tr': 161,           # [W/K]
                         'H_tr_light' : 35.1 + 2.6, # [W/K]
-                        'c_bldg': 30,          # [Wh/(m^2K)] Leicht-Hohlziegel - leicht nach DIN EN ISO 13790 - Tabelle 12
+                        'c_bldg': 30,          # [Wh/(m^2K)] Light hollow brick - light (Leicht-Hohlziegel - leicht) according to DIN EN ISO 13790 - Table 12
                         'area_floor': 215.6,   # [m^2]
                         'height_room': 2.5,    # [m]
                         'name': 'sfh_1979_1983_1_enev'}
@@ -80,11 +80,11 @@ sfh_1979_1983_1_enev['position'] = {'lat': 48.0252,
 # TABULA source DE.N.SFH.07.Gen.ReEx.001.003
 # ------------------------------------------------------------
 
-# Geometry and meterial properties
+# Geometry and material properties
 sfh_1979_1983_2_kfw = {'H_ve': 92,            # [W/K]
                        'H_tr': 84,            # [W/K]
                        'H_tr_light' : 21.6 + 1.6, # [W/K]
-                       'c_bldg': 30,          # [Wh/(m^2K)] Leicht-Hohlziegel - leicht nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 30,          # [Wh/(m^2K)] Light hollow brick - light (Leicht-Hohlziegel - leicht) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 215.6,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_1979_1983_2_kfw'}

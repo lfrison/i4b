@@ -13,7 +13,7 @@ Construction period 1919 - 1948
 sfh_1919_1948_0_soc = {'H_ve': 154,           # [W/K]
                        'H_tr': 973,           # [W/K]
                        'H_tr_light' : 146.6 + 6, # [W/K]
-                       'c_bldg': 72,          # [Wh/(m^2K)] Vollziegel-Mauerwerk - schwer nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 72,          # [Wh/(m^2K)] Solid brick masonry - heavy (Vollziegel-Mauerwerk - schwer) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 302.5,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_1919_1948_0_soc'}
@@ -47,7 +47,7 @@ sfh_1919_1948_0_soc['position'] = {'lat': 48.0252,
 sfh_1919_1948_1_enev = {'H_ve': 154,           # [W/K]
                         'H_tr': 302,           # [W/K]
                         'H_tr_light' : 68.1 + 2.6, # [W/K]
-                        'c_bldg': 72,          # [Wh/(m^2K)] Vollziegel-Mauerwerk - schwer nach DIN EN ISO 13790 - Tabelle 12
+                        'c_bldg': 72,          # [Wh/(m^2K)] Solid brick masonry - heavy (Vollziegel-Mauerwerk - schwer) according to DIN EN ISO 13790 - Table 12
                         'area_floor': 302.5,   # [m^2]
                         'height_room': 2.5,    # [m]
                         'name': 'sfh_1919_1948_1_enev'}
@@ -82,7 +82,7 @@ sfh_1919_1948_1_enev['position'] = {'lat': 48.0252,
 sfh_1919_1948_2_kfw = {'H_ve': 129,           # [W/K]
                        'H_tr': 153,           # [W/K]
                        'H_tr_light' : 41.9 + 1.6, # [W/K]
-                       'c_bldg': 72,          # [Wh/(m^2K)] Vollziegel-Mauerwerk - schwer nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 72,          # [Wh/(m^2K)] Solid brick masonry - heavy (Vollziegel-Mauerwerk - schwer) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 302.5,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_1919_1948_2_kfw'}

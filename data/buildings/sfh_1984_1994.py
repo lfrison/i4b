@@ -14,7 +14,7 @@ Construction period 1984 - 1994
 sfh_1984_1994_0_soc = {'H_ve': 77,            # [W/K]
                        'H_tr': 319,           # [W/K]
                        'H_tr_light' : 94.9 + 6, # [W/K]
-                       'c_bldg': 45,          # [Wh/(m^2K)] Porenbeton - mittel nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 45,          # [Wh/(m^2K)] Aerated concrete - medium (Porenbeton - mittel) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 150.2,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_1984_1994_0_soc'}
@@ -49,7 +49,7 @@ sfh_1984_1994_0_soc['position'] = {'lat': 48.0252,
 sfh_1984_1994_1_enev = {'H_ve': 77,            # [W/K]
                         'H_tr': 184,           # [W/K]
                         'H_tr_light' : 38.6 + 2.6, # [W/K]
-                        'c_bldg': 45,          # [Wh/(m^2K)] Porenbeton - mittel nach DIN EN ISO 13790 - Tabelle 12
+                        'c_bldg': 45,          # [Wh/(m^2K)] Aerated concrete - medium (Porenbeton - mittel) according to DIN EN ISO 13790 - Table 12
                         'area_floor': 150.2,   # [m^2]
                         'height_room': 2.5,    # [m]
                         'name': 'sfh_1984_1994_1_enev'}
@@ -84,7 +84,7 @@ sfh_1984_1994_1_enev['position'] = {'lat': 48.0252,
 sfh_1984_1994_2_kfw = {'H_ve': 64,            # [W/K]
                        'H_tr': 95,           # [W/K]
                        'H_tr_light' : 23.7 + 1.6, # [W/K]
-                       'c_bldg': 45,          # [Wh/(m^2K)] Porenbeton - mittel nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 45,          # [Wh/(m^2K)] Aerated concrete - medium (Porenbeton - mittel) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 150.2,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_1984_1994_2_kfw'}

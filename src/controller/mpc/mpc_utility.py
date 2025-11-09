@@ -140,9 +140,11 @@ def init_file(columns,resultdir = "results_mpc",resultfile=None):
       print ('\n****** Result file: %s/%s.csv.' %(resultdir,resultfile))
       
       
-def update_file(time,resultfile,resultdir,P,uk,xk):
+def update_file(time,resultfile,resultdir,P,uk,xk,P_el_kWh=None):
    nx = xk.shape[0]
    res_arr = np.column_stack((time,np.reshape(xk[:nx],(1,nx)),uk,np.reshape(P[0,:],(1,P.shape[1]))))
+   if P_el_kWh is not None:
+       res_arr = np.column_stack((res_arr, P_el_kWh))
    df_mpc = pd.DataFrame(data=res_arr)
    df_mpc.to_csv('%s/%s.csv' % (resultdir,resultfile), header=False,mode='a',index=None) 
   

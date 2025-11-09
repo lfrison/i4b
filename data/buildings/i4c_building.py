@@ -2,7 +2,7 @@
 #from Utilities import C_AIR_SPEC, RHO_AIR
 from src.models.model_buildings import C_AIR_SPEC, RHO_AIR,C_INT_SPEC
 
-# geometry and material properties
+# Geometry and material properties
 i4c = {"H_ve": 88.93,
         "H_tr": 192.88, # including thermal bridges
         "area_floor": 393.32,
@@ -10,9 +10,9 @@ i4c = {"H_ve": 88.93,
         "name" : 'i4c'
         }
 
-# calculate spec heat capacity
+# Calculate specific heat capacities and derived totals
 volume_air = i4c['height_room'] * i4c['area_floor']
-C_wall = 24845 * 3600 # J/K see. i4cBuildingModel.doc
+C_wall = 24845 * 3600 # J/K
 C_air = C_AIR_SPEC * RHO_AIR * volume_air # J/K
 C_int = C_INT_SPEC * i4c['area_floor'] # J/K
 C_zone = C_air + C_int # J/K
@@ -33,22 +33,20 @@ w_west = {'area': 14.23, 'tilt': 90, 'azimuth': 270, 'g_value': 0.5, 'c_frame': 
 windows = [skylight, w_north, w_east, w_south, w_west]
 i4c['windows'] = windows
 
-# position
+# Geolocation
 i4c['position'] = {'lat': 48.0252,
                    'long': 7.7184,
                    'altitude': 207,
                    'timezone' : 'Europe/Berlin'}
 #%% Calculation of heat transmission through light building elements
 
-''' TRANSMISSION HEAT LOSSES 
-In ISO 13790 the transmission heat losses through light- (doors, windows) and
-heavy building elements are handeled individually. 
-To calculate the individuall specific heatlosses first the specific heat losses
-for the light building elements are calculated and are than subtracted
-from the total specific heat losses to obtain the specific heat losses through 
-the heavy building elements  '''
+''' TRANSMISSION HEAT LOSSES
+According to ISO 13790, transmission heat losses through light (doors, windows)
+and heavy building elements are handled individually. We first calculate the
+specific losses for light elements and subtract them from the total specific
+losses to obtain the losses through heavy elements. '''
 
-# GEOMETRY - parameters as given in ENEV-Nachweiß
+# Geometry - parameters from EnEV certificate
 
 a_surf = 836.23 # Total surface area of the building [m^2]
 a_cond = 393.32 # Conditioned floor area [m^2]
@@ -60,14 +58,14 @@ a_win_roof = 1.89 # Area of the skylight (Pos. 2)
 a_win_h = a_win - a_win_roof # Area of all horizontal windows
 a_door = 2.62 + 4.52 # Area of both doors (Pos. 19 & 39)
 
-# MATERIAL 
-# U-Values of all light building elements [W/(m^2K)]
+# Material
+# U-values of all light building elements [W/(m^2K)]
 u_win_roof = 1.0 # u-value of the skylight
 u_win_h = 0.76 # u-value of all horizontal windows
 u_door = 1 # u-value of both doors
 
-# Heat losses due to thermal bridges (see. Aufmaß Wärmebrücken... .xlsx)
-H_tb_light = 6.88 # heat losses - thermal bridges light building elements  
+# Heat losses due to thermal bridges
+H_tb_light = 6.88 # heat losses - thermal bridges for light building elements
 
 # Area of all light building elements
 a_light = a_win_roof + a_win_h + a_door
