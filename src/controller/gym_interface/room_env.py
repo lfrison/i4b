@@ -21,7 +21,7 @@ OBSERVATION_SPACE_LIMIT = {
     'T_amb': (-25, 45),
     'T_forecast' : (-25, 45),
     'Qdot_gains': (0, 8000),
-    'goal_constraint' : (0, 3),
+    'goal_temperature': (15, 30),
 }
 
 class RoomHeatEnv(gym.Env):   
@@ -48,8 +48,6 @@ class RoomHeatEnv(gym.Env):
         reward_function_idx: int = 0,
         goal_based: bool = False,
         noise_level: float = 0.0,
-        # TODO: allow flexible goal
-        goal_constraint_limit: float = None,
     ):
         """This model implements a OpenAI gym wrapper for a Room temperature simulator.
         """    
@@ -109,7 +107,6 @@ class RoomHeatEnv(gym.Env):
         self.dev_max_weight = dev_max_weight
         
         self.goal_based = goal_based
-        self.goal_constraint_limit = goal_constraint_limit
         
         self.obs_keys = self.bldg_model.state_keys
         self.p_keys = ["T_amb", "Qdot_gains"]
@@ -158,9 +155,6 @@ class RoomHeatEnv(gym.Env):
         self.cur_action = None
         self.prev_action = None
         self.random_init = random_init
-
-        if goal_constraint_limit is not None and goal_based:
-            assert goal_constraint_limit >= 0, "Goal constraint limit must be positive"
         
         self.reward_function_idx = reward_function_idx
         self.reset()

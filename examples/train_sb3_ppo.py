@@ -22,6 +22,9 @@ def make_env_fn(args):
             timestep=args.timestep,
             days=args.days,
             random_init=args.random_init,
+            goal_based=args.goal_based,
+            goal_temp_range=(args.goal_temp_min, args.goal_temp_max),
+            temp_deviation_weight=args.temp_deviation_weight,
             noise_level=args.obs_noise,
         )
         env = Monitor(env)
@@ -41,6 +44,13 @@ def main():
     parser.add_argument('--random_init', action='store_true')
     parser.add_argument('--forecast', action='store_true')
     parser.add_argument('--obs_noise', type=float, default=0.0)
+    # Goal-based learning parameters
+    parser.add_argument('--goal_based', action='store_true', help='Enable goal-based learning')
+    parser.add_argument('--goal_temp_min', type=float, default=19.0, help='Minimum goal temperature')
+    parser.add_argument('--goal_temp_max', type=float, default=28.0, help='Maximum goal temperature')
+    parser.add_argument('--temp_deviation_weight', type=float, default=0.0, 
+                        help='Weight for temperature deviation in reward (0=disabled)')
+    # Training parameters
     parser.add_argument('--total_timesteps', type=int, default=200_000)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--logdir', type=str, default='runs/ppo_roomheat')

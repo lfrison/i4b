@@ -87,7 +87,7 @@ OBSERVATION_SPACE_LIMIT = {
     'T_amb': (-25, 45),
     'T_forecast' : (-25, 45),
     'Qdot_gains': (0, 8000),
-    'goal_constraint' : (0, 3),
+    'goal_temperature': (15, 30),  # Goal temperature range for goal-based learning
 }
 
 import sys, os
@@ -183,6 +183,9 @@ def make_room_heat_env(
     timestep: int = 3600,
     days: int = None,
     random_init: bool = False,
+    goal_based: bool = False,
+    goal_temp_range: tuple = (19.0, 28.0),
+    temp_deviation_weight: float = 0.0,
     noise_level: float = 0.0,
     version: int = 0,
 ):
@@ -190,6 +193,37 @@ def make_room_heat_env(
 
     This registers an env-id on the fly using the provided configuration and
     then returns a constructed environment.
+    
+    Parameters
+    ----------
+    building : str
+        Building name/key.
+    hp_model : str
+        Heat pump model name.
+    method : str
+        Building model method (e.g., '4R3C').
+    mdot_HP : float
+        Mass flow rate in kg/s.
+    internal_gain_profile : str
+        Path to internal gains profile.
+    weather_forecast_steps : list, optional
+        List of forecast steps.
+    timestep : int
+        Simulation timestep in seconds.
+    days : int, optional
+        Episode length in days.
+    random_init : bool
+        Whether to randomize initial conditions.
+    goal_based : bool
+        Enable goal-based learning mode.
+    goal_temp_range : tuple
+        Range for goal temperature (min, max) in °C.
+    temp_deviation_weight : float
+        Weight for temperature deviation in reward.
+    noise_level : float
+        Observation noise standard deviation.
+    version : int
+        Environment version number.
     """
     if weather_forecast_steps is None:
         weather_forecast_steps = []
@@ -209,6 +243,9 @@ def make_room_heat_env(
         timestep=timestep,
         days=days,
         random_init=random_init,
+        goal_based=goal_based,
+        goal_temp_range=goal_temp_range,
+        temp_deviation_weight=temp_deviation_weight,
         noise_level=noise_level,
     )
     return make(env_id)
