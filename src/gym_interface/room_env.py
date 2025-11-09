@@ -47,7 +47,7 @@ class RoomHeatEnv(gym.Env):
         goal_based: bool = False,
         goal_temp_range: Tuple[float, float] = (19.0, 28.0),
         # Reward shaping parameters
-        temp_deviation_weight: float = 100.,
+        temp_deviation_weight: float = 0.0,
         # Observation noise
         noise_level: float = 0.0,
         # Legacy parameters (kept for compatibility)
