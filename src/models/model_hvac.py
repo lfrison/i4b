@@ -204,6 +204,13 @@ class Heatpump_AW(Heatpump):
 
         Notes
         -----
+        The parameterization of the heat pump model was based on the manufacturer data of the Dimplex LA 6TU air-water heat pump.
+        This model was selected because it is listed in the BAFA list and ranks in the middle range regarding COP.
+            - Return temperature min. / Supply temperature max. 18 / 60 °C +/- 2
+            - Lower operating limit heat source (heating mode) / Upper operating limit heat source (heating mode) -22 / 35 °C
+            - Heating capacity from 2.28..8.04 kW
+        
+        Original German text (for reference):
         Die Parametrierung des Wärmepumpenmodells erfolgte anhand der Herstellerdaten der Dimplex LA 6TU Luft/Wasser-Wärmepumpe.
         Dieses Modell wurde ausgewählt, weil es zum einen in der BAFA-Liste aufgeführt wird und dort bezüglich des COPs im Mittelfeld rangiert.
             - Rücklauftemperatur min. / Vorlauftemperatur max. 7) 18 / 60 °C +/- 2
@@ -238,7 +245,6 @@ class Heatpump_AW(Heatpump):
         a = np.array((8.2553, -0.17068, 0.16176, 0.00108, 0.00022, -0.00186))
         COP = a[0] + a[1]*T_hp + a[2]*T_amb + a[3]*T_hp**2 + a[4]*T_amb**2 + a[5]*T_hp*T_amb
         return COP
-
         
     def Qth(self,T_hp,T_amb):
         """ Calculates thermal power from polynomial curve fit.

@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Apr 19 08:22:14 2021
-
-@author: lfrison
+Utility functions for plotting and data handling in the MPC/simulation workflow.
 """
 
 import os
@@ -19,28 +17,28 @@ C_WATER_SPEC = 4181  # Spec. heat capacity of water [J/kg/K]
 C_AIR_SPEC = 1.005   # Spec. heat capacity of air [J/kg/K]
 
 
-def evaluate_results(x_arr,T_HP,T_amb,Q_HP,h=3600):   
-    ''' function to plot results of simulation.
+def evaluate_results(x_arr, T_HP, T_amb, Q_HP, h=3600):   
+    """Plot key simulation results.
 
     Parameters
     ----------
-    x_arr : np-array
-        2d array of the reults with t_room and t_return. 
-        make sure both have len of other input arrays (usually x_arr[:-1])
-    T_HP : np-array
+    x_arr : numpy.ndarray
+        2D array of the results with room and return temperatures.
+        Ensure the time dimension matches the other inputs (usually x_arr[:-1]).
+    T_HP : numpy.ndarray
         supply flow temperature [°C]
-    T_amb : np-array
+    T_amb : numpy.ndarray
         ambient temperature [°C]
-    Q_HP : np-array
-        thermal heat pump power [kW] 
+    Q_HP : numpy.ndarray
+        thermal heat pump power [kW]
     h : int, optional
         time_steps in [sec]. The default is 3600.
 
     Returns
     -------
-    None.
+    None
 
-    '''
+    """
     num_steps = x_arr.shape[0]
     time =  np.linspace(0,(num_steps*h)-h,num_steps)
     
@@ -49,7 +47,7 @@ def evaluate_results(x_arr,T_HP,T_amb,Q_HP,h=3600):
     ax.plot(time,x_arr[:,-1],label='T_return', alpha=0.6,color='blue')
     ax.plot(time,x_arr[:,0],label='T_room', alpha=0.6,color='red')
     ax.plot(time,T_amb[:num_steps],label='T_amb', alpha=0.6,color='k')
-    ax.set_ylabel('temperature')
+    ax.set_ylabel('temperature [°C]')
     
     axtwin = ax.twinx()
     axtwin.plot(time,Q_HP,label='Qth_HP', alpha=0.6,color='darkred')
@@ -62,8 +60,7 @@ def evaluate_results(x_arr,T_HP,T_amb,Q_HP,h=3600):
   
    
 def plot_timeconstant(temp, temp_start, temp_end, tau, step_size):
-   ''' Plot containing the timeconstant to show the dynamic behaviour.
-   '''
+   """Plot the time constant illustrating dynamic behavior."""
    num_steps = temp.shape[0]
    time = np.linspace(0,step_size*(num_steps-1)/3600, num_steps) # in hours
    temp_tau = (1-0.632)*temp_start
@@ -84,7 +81,7 @@ def plot_timeconstant(temp, temp_start, temp_end, tau, step_size):
    
 def plot_monthly_results(heatdemand):
    fig, ax = plt.subplots(1, figsize=(12,4))
-   months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dez']
+   months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
    plt.plot(months, heatdemand.groupby([heatdemand.index.month]).sum(),label = 'Heating demand', c = 'red')
    
    # title and legend
@@ -93,32 +90,29 @@ def plot_monthly_results(heatdemand):
    plt.title('Monthly sums\n', loc='left')
    plt.show()
       
-def read_weather_data(input_file,h):
-   """Read weather data"""
+def read_weather_data(input_file, h):
+   """Read weather data (CSV) and resample to the given step size."""
 
    df_data = pd.read_csv('data\\%s'%(input_file+'.csv'), sep=',',header=0,index_col=0)
 
-   #df_data.index=pd.to_datetime(df_data.index,utc=True)
-   #df_data = df_data[date_start : date_end]
-   #df_data=df_data.resample(sample_int).mean()
+   # Optional: time filtering/resampling can be added here if needed
    df_data = df_data.fillna(0)
    df_data = df_data.iloc[::int(h/900)] # resampling
        
    return df_data['T_amb']
 
 
-def plot(fig,ax,plt,tf):
-   if tf>86400:
+def plot(fig, ax, plt, tf):
+   if tf > 86400:
       step=86400
       ax.set_xlabel('time [d]')
    else:
       step=3600
-      ax.set_xlabel('Zeit in h')
-      #ax.set_xlabel('time [h]')
+      ax.set_xlabel('time [h]')
    #ax.legend();
    ax.set_xlim([0,tf])
-   n=int(tf/step)
-   plt.xticks([scale*step for scale in range(n+1)],['%i'%scale for scale in range(n+1)])
+   n = int(tf/step)
+   plt.xticks([scale*step for scale in range(n+1)], ['%i' % scale for scale in range(n+1)])
    plt.show()   
      
 

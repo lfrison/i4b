@@ -185,7 +185,7 @@ class RoomHeatEnv(gym.Env):
             bldg_area = self.building['area_floor'])
         Qdot_sol = get_solar_gains(weather = self.weather_data, bldg_params = self.building)
         Qdot_gains = pd.DataFrame(Qdot_sol + self.internal_gains_df['Qdot_tot'] , columns = ['Qdot_gains']) # calculate total gains
-        self.p = pd.concat([self.weather_data['T_amb'], Qdot_gains], axis = 1).astype(np.float32).resample(f'{self.timestep}S').pad() # Disturbances
+        self.p = pd.concat([self.weather_data['T_amb'], Qdot_gains], axis = 1).astype(np.float32).resample(f'{self.timestep}s').ffill() # Disturbances
         self.hp_model_name = hp_model
 
         self.weather_forecast_data = weather_forecast_profile

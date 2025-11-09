@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-""" Fast and simple environment for building and hvac simulation.
-
-"""
+"""Fast and simple environment for building and HVAC simulation."""
 
 import numpy as np
 import pandas as pd
@@ -10,8 +8,7 @@ import random
 from scipy.integrate import solve_ivp
 
 class Model_simulator:
-    """ The simulator class can be used to perform a one-step-integration and a
-    rule based simulation using the heating curve.
+    """Simulator for one-step integration and rule-based simulation using a heating curve.
     
     Attributes
     ----------
@@ -30,14 +27,13 @@ class Model_simulator:
         self.timestep = timestep  # sampling interval in s
         
     def get_next_state(self, x_init, uk, pk):
-        """ Compute temperature states of the building at next time point with given 
-        heat pump charge temperature.
+        """Compute next building temperature states given the heat pump supply setpoint.
         
         Parameters
         ----------
         x_init : dict
-            Initial state of the system (State keys depend on calculation method)
-            They can be found in building_model.state_keys after initalisation.
+            Initial state of the system (state keys depend on the selected method).
+            Available keys are listed in building_model.state_keys after initialisation.
         
         uk : float
             Control variable:
@@ -60,7 +56,7 @@ class Model_simulator:
         state_keys =  self.bldg_model.state_keys
         input_keys = self.bldg_model.input_keys
         
-        # Create inital state based on state_keys and x_init dict
+        # Create initial state based on state_keys and x_init dict
         x_init_np = np.array([x_init[key] for key in state_keys])
              
         # Combine control variable uk and disturbance vector pk
@@ -72,7 +68,6 @@ class Model_simulator:
         input_values = [[input_dict[key] for key in input_keys]]
         
         # Compute next state
-        #print(self.bldg_model.params['H_ve'],self.bldg_model.params['H_tr_heavy'])
         ode_result_obj = solve_ivp(self.bldg_model.calc, #model.dynamics,
                                    [0, self.timestep],
                                    x_init_np,
@@ -111,15 +106,15 @@ class Model_simulator:
 
     def simulate(self, x_init, p, T_room_set = 20, SCENARIO_MODE = False, ctrl_method = 'heatcurve', 
                  num_steps = 0,  **kwargs):
-        """ Building simulation with heatingcurve or pid controller.
+        """Building simulation with heating curve or PID controller.
 
         Make sure that the frequency of the datetime index is equal to the timestep of the Simulator.
      
         Parameters
         ----------
         x_init : dict
-            Initial state of the system (State keys depend on calculation method)
-            They can be found in Building.state_keys after initalisation.
+            Initial state of the system (state keys depend on calculation method).
+            They can be found in Building.state_keys after initialisation.
 
         T_room_set : float
             Set point temperature for indoor comfort [degC]
@@ -133,7 +128,7 @@ class Model_simulator:
             - Qdot_sol   (timeseries)      : Precomputed solar gains [W]
 
         ctrl_method : str
-            Control strategy, possible options: heatcurve (default), pid
+            Control strategy, possible options: 'heatcurve' (default), 'pid'.
 
         num_steps : float, optional
             Number of simulation steps. If not specified, the length of the disturbance vector is used.
@@ -162,11 +157,11 @@ class Model_simulator:
             from src.controller.pid import pid
             ctrl = pid.PID(timestep = self.timestep, KP = kwargs['KP'], KI = kwargs['KI'], KD = kwargs['KD'])
         
-        # If maximum number of steps is not defined, use lenght of disturbance vector
+        # If maximum number of steps is not defined, use length of disturbance vector
         if num_steps: 
             p = p.iloc[:num_steps] 
 
-        timestep   = self.timestep # lenght of one simulation step [s]
+        timestep = self.timestep # length of one simulation step [s]
 
         # INITIALIZE STATES_DF
         # Get available state and control keys from building_model
@@ -177,11 +172,11 @@ class Model_simulator:
                                  columns=([key for key in state_keys]))
         
         # We have to add an additional index at the end of the df
-        timestep = p.index[1] - p.index[0] # Extract lenght of timestep from dist. data
+        timestep = p.index[1] - p.index[0] # Extract length of timestep from disturbance data
         last_index = p.index[-1] + timestep # Create index for last simulation step
-        states_df.loc[last_index] = ['NaN' for key in state_keys] # Append row at end of df
+        states_df.loc[last_index] = [np.nan for key in state_keys] # Append row at end of df
         
-        # Insert inital values at inital index
+        # Insert initial values at initial index
         states_df.iloc[0] = x_init
 
         # INITIALIZE TIME SERIES FOR CONTROL VARIABLE
@@ -199,6 +194,9 @@ class Model_simulator:
         costs_df = pd.DataFrame(index = states_df.index,
                                 columns=([key for key in cost_keys]))
         
+        # Initialize first row of costs_df with zeros (will be filled after first step)
+        costs_df.iloc[0] = 0.0
+        
         bldg_model_params_H_ve = self.bldg_model.params['H_ve'] # store value
         bldg_model_params_H_rad_con = self.bldg_model.params['H_rad_con'] # store value
         bldg_model_params_H_tr_heavy = self.bldg_model.params['H_tr_heavy']
@@ -207,7 +205,7 @@ class Model_simulator:
         for i in range(len(p)):
             pk = p.iloc[i].to_dict() # get disturbance values for current time step
 
-            # calculate control variable
+            # Calculate control variable
             if ctrl_method == 'pid':
                 uk = ctrl.calc(set_point = T_room_set, actual_value = states_df['T_room'].iloc[i]) # Supply temperature [degC]
             elif ctrl_method == 'heatcurve':
@@ -218,7 +216,7 @@ class Model_simulator:
                     offset = kwargs['offset']
                 uk = ctrl.calc(pk['T_amb'], shift_T_lim = shift, offset_T_flow_nom = offset)[0]
 
-            # Only if upper heating limit temp. is not exceeded by ambient temp.
+            # Only if upper heating limit temperature is not exceeded by ambient temperature
             if pk['T_amb'] < self.bldg_model.params['T_amb_lim']:
                 # Set control variable supply flow temperature according to heating curve
                 uk = max(uk + self.bldg_model.params['T_offset'], states_df['T_hp_ret'].iat[i])
@@ -229,7 +227,7 @@ class Model_simulator:
             # Check if HP supply temperature is within the range
             uk = self.hp_model.check_hp(uk, states_df['T_hp_ret'].iat[i])
             
-            # scenario generation
+            # Scenario generation
             if SCENARIO_MODE:
                 if i%8==0: random_var = random.choices([0, 1], weights=[99,1])[0]
                 if random_var == 1:

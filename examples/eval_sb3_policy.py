@@ -2,7 +2,7 @@ import os
 import argparse
 import numpy as np
 from stable_baselines3 import PPO
-from gym_interface import make_room_heat_env
+from src.gym_interface import make_room_heat_env
 
 
 def evaluate(model, env, num_episodes=5):

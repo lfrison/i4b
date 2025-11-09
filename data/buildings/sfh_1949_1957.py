@@ -13,7 +13,7 @@ Construction period 1949 - 1957
 sfh_1949_1957_0_soc = {'H_ve': 57,            # [W/K]
                        'H_tr': 465,           # [W/K]
                        'H_tr_light' : 51.5 + 6, # [W/K]
-                       'c_bldg': 72,          # [Wh/(m^2K)] zweischaliges Mauerwerk - schwer nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 72,          # [Wh/(m^2K)] Double-shell masonry - heavy (zweischaliges Mauerwerk - schwer) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 111.1,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_1949_1957_0_soc'}
@@ -48,7 +48,7 @@ sfh_1949_1957_0_soc['position'] = {'lat': 48.0252,
 sfh_1949_1957_1_enev = {'H_ve': 57,            # [W/K]
                         'H_tr': 171,           # [W/K]
                         'H_tr_light' : 23.9 + 2.6, # [W/K]
-                        'c_bldg': 72,          # [Wh/(m^2K)] zweischaliges Mauerwerk - schwer nach DIN EN ISO 13790 - Tabelle 12
+                        'c_bldg': 72,          # [Wh/(m^2K)] Double-shell masonry - heavy (zweischaliges Mauerwerk - schwer) according to DIN EN ISO 13790 - Table 12
                         'area_floor': 111.1,   # [m^2]
                         'height_room': 2.5,    # [m]
                         'name': 'sfh_1949_1957_1_enev'}
@@ -83,7 +83,7 @@ sfh_1949_1957_1_enev['position'] = {'lat': 48.0252,
 sfh_1949_1957_2_kfw = {'H_ve': 47,            # [W/K]
                        'H_tr': 75,            # [W/K]
                        'H_tr_light' : 14.7 + 1.6, # [W/K]
-                       'c_bldg': 72,          # [Wh/(m^2K)] zweischaliges Mauerwerk - schwer nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 72,          # [Wh/(m^2K)] Double-shell masonry - heavy (zweischaliges Mauerwerk - schwer) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 111.1,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_1949_1957_2_kfw'}

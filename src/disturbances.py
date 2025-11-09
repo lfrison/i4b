@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-#Functions to generate disturbance profiles.
+# Functions to generate disturbance profiles.
 
 from pathlib import Path
 
@@ -11,26 +11,25 @@ import json
 import random
 
 
-def generate_disturbances_all(building_model,year=2015,timestep=900,offset_days=0,GRID_ON=True):
+def generate_disturbances_all(building_model, year=2015, timestep=900, offset_days=0, GRID_ON=True):
    '''
-   Put all disturbances together
-   T_amb (ambient temperature)
-   Q_gains (internal and solar gains)
-   T_set_low (lower set point temperature)
-   grid (grid signal e.g. price)
+   Compose all disturbances:
+   - T_amb (ambient temperature)
+   - Q_gains (internal + solar gains)
+   - T_set_low (lower setpoint temperature)
+   - grid (grid signal, e.g., price)
 
    Parameters
    ----------
-   building model: 
+   building_model: Building
 
    timestep: int
-      Sampling time in s, used for resampling 
+      Sampling time in seconds, used for resampling
       
       
       
-   GRID_ON: 
-      flag wheather grid signal (grid-supportive operation) or 
-      constant unit signal (energy efficient operation) should be used 
+   GRID_ON: bool
+      If True uses a grid-supportive signal; otherwise uses a constant unit signal.
       
    Returns
    -------
@@ -43,13 +42,13 @@ def generate_disturbances_all(building_model,year=2015,timestep=900,offset_days=
                                  altitude  = building_model.params['position']['altitude'],
                                  year=year)[0:8760]
 
-   # 2. Generate absolut heat gain profiles, based on datetime, building usage and floor area. 
+   # 2. Generate absolute heat gain profiles based on datetime, building usage and floor area.
    # Profiles: Profil_HIL, ResidentialDetached
    int_gains_df = get_int_gains(time = weather_df.index,
                                    profile_path = 'data/profiles/InternalGains/ResidentialDetached.csv',
                                    bldg_area = building_model.params['area_floor'] )
 
-   # 3. Generate profiles of solar heat gains, based on datetime and irradiance data in the weather df, 
+   # 3. Generate profiles of solar heat gains, based on datetime and irradiance data in the weather df,
    # and the window properties defined in the building parameters.
    Qdot_sol = get_solar_gains(weather = weather_df, bldg_params = building_model.params)
 
@@ -78,7 +77,7 @@ def generate_disturbances_all(building_model,year=2015,timestep=900,offset_days=
       data_grid_[:data_grid[::2].shape[0]] = data_grid[::2]
       data_grid_[data_grid[::2].shape[0]:] = data_grid[1::2]
 
-      # check for nans: np.argwhere(np.isnan(data_grid))
+      # check for NaNs: np.argwhere(np.isnan(data_grid))
       #bins = np.linspace(np.nanmin(data_grid),np.nanmax(data_grid),10)
       #grid_bins=(np.digitize(data_grid,bins))#*.1
       #data_grid=grid_bins
@@ -86,7 +85,7 @@ def generate_disturbances_all(building_model,year=2015,timestep=900,offset_days=
    
 
    # resample parameter vector to new frequency
-   p = p_hourly.resample(f'{timestep}S').ffill() # resample disturbance (freq)
+   p = p_hourly.resample(f'{timestep}s').ffill() # resample disturbance (freq)
 
    # set offset days in order to shift some days (default 0 offset)
    p_hourly = p_hourly[int(offset_days*24):]
@@ -95,12 +94,12 @@ def generate_disturbances_all(building_model,year=2015,timestep=900,offset_days=
 
 
 def generate_disturbances(building, year=2015, repo_filepath=''):
-    ''' Generates pandas df containing series of disturbances for ambient temerpature and internal and solar heat gains.
+    '''Generate a dataframe of ambient temperature and internal/solar heat gain disturbances.
 
     Parameters
     ----------
-    building : instance of class Building
-        object containing building model and parameters
+    building : Building
+        Object containing the building model and parameters
 
     Returns
     -------
@@ -117,9 +116,10 @@ def generate_disturbances(building, year=2015, repo_filepath=''):
     weather_df = load_weather(latitude = pos['lat'], longitude = pos['long'], 
                               altitude  = pos['altitude'], year=year, repo_filepath=repo_filepath) # Load, and then select the first week of the data
 
-    # Generate absolute heat gain profiles, based on datetime, building usage and floor area. 
+    # Generate absolute heat gain profiles based on datetime, building usage and floor area.
+    profile_path = Path(repo_filepath, 'data', 'profiles', 'InternalGains', f'{building.usage}.csv')
     int_gains_df = get_int_gains(time = weather_df.index, 
-                                 profile_path = f'{repo_filepath}/data/profiles/InternalGains/{building.usage}.csv',
+                                 profile_path = str(profile_path),
                                  bldg_area = building.params['area_floor'] )
 
     # Generate profiles of solar heat gains, based on datetime and irradiance data in the weather df, 
@@ -139,8 +139,7 @@ def load_weather(latitude, longitude, altitude=0, year=2015, tz='Europe/Berlin',
     Loads weather data, extracts ambient temperature & irradiance data and returns them in
     a pandas dataframe.
     
-    If a DWD weather file exists for the given location, this file is used. If not, the PVGIS
-    online tool is used.
+    If a DWD weather file exists for the given location, this file is used. Otherwise, PVGIS online data is used.
     
     An example DWD weather file for a location close to Freiburg can be found in the data/weather/ directory.
     Custom DWD weather files can be downloaded at: https://kunden.dwd.de/obt/.
@@ -160,7 +159,7 @@ def load_weather(latitude, longitude, altitude=0, year=2015, tz='Europe/Berlin',
 
     year: int, optional
         Year of weather data. Default is 2015.
-        ATTENTION: Not valid for leapyear.
+        Note: Not valid for leap years.
 
     tz: str, optional
         Timezone. Default is 'Europe/Berlin'.
@@ -189,16 +188,16 @@ def load_weather(latitude, longitude, altitude=0, year=2015, tz='Europe/Berlin',
     # If a dwd file for the given location exists, process it
     if dwd_filepath.exists():
 
-        raw = pd.read_table(dwd_filepath, header=27, na_values='***', delim_whitespace=True)
+        raw = pd.read_table(dwd_filepath, header=27, na_values='***', sep='\s+')
         raw.dropna(inplace=True)
         raw.index = pd.date_range(start=f'{year}-01-01 00:00:00', periods=len(raw), freq='h')
         
         df = pd.DataFrame(data=None, index=raw.index)
-        df['T_amb'] = raw.t.values              # Ambient temperature 
+        df['T_amb'] = raw.t.values              # Ambient temperature
         df['dhi'] = raw.D.values                # Diffuse horizontal irradiation
         df['ghi'] = raw.B.values + raw.D.values # Global horizontal irradiation
 
-        # Unfortunatly the dwd files do not provide the direct normal irradiation (dni)
+        # Unfortunately the DWD files do not provide the direct normal irradiation (dni)
         # which is needed to calculate the solar heat gains. Pvlib can approximate this.
         location = pvlib.location.Location(latitude=latitude, longitude=longitude,
                                            tz=tz, altitude=altitude)
@@ -210,7 +209,7 @@ def load_weather(latitude, longitude, altitude=0, year=2015, tz='Europe/Berlin',
 
     # Otherwise load the data from PVGIS online API tool
     else:
-        df = load_weather_pvgis(latitude, longitude, start_year=year, end_year=year, tz=tz)
+        df = load_weather_pvgis(latitude, longitude, start_year=year, end_year=year, tz=tz, repo_filepath=repo_filepath)
 
     return df
 
@@ -219,8 +218,7 @@ def load_weather(latitude, longitude, altitude=0, year=2015, tz='Europe/Berlin',
 def load_weather_pvgis(latitude, longitude, start_year=2015, end_year=2015, 
                        tz='Europe/Berlin', repo_filepath=''):
     '''
-    Loads weather data, extracts ambient temperature & irradiance data and returns them in
-    a pandas dataframe. PVGIS online tool is used to get the data.
+    Load weather data (ambient temperature and irradiance) via PVGIS online tool.
 
     Parameters
     ----------
@@ -277,14 +275,14 @@ def load_weather_pvgis(latitude, longitude, start_year=2015, end_year=2015,
     # Calculate global horizontal irradiation
     # Global horizontal irradiation = Direct horizontal irradiation +
     #                                 Diffuse horizontal irradiation +
-    #                                 Reflected horizontal irratiation
+    #                                 Reflected horizontal irradiation
     df['ghi'] = df['Gb(i)'] + df['Gd(i)'] + df['Gr(i)']
 
     # Filter and rename columns
     col_dict = {
                 'T2m':'T_amb',      # Ambient temperature
-                'Gd(i)':'dhi',      # Diffuse horizontal irridiation
-                'ghi':'ghi',        # Global horizontal irridiation
+                'Gd(i)':'dhi',      # Diffuse horizontal irradiation
+                'ghi':'ghi',        # Global horizontal irradiation
                }
     col_names = [name for name in col_dict.keys()]
     df = df[col_names]
@@ -309,7 +307,7 @@ def load_weather_pvgis(latitude, longitude, start_year=2015, end_year=2015,
 
     # Resample to make sure that index is in full-hour steps
     # (e.g. not 00:10:00, 01:10:00, ...)
-    df = df.resample('1H').ffill().bfill()
+    df = df.resample('1h').ffill().bfill()
 
     return df
 
@@ -405,6 +403,8 @@ def _fetch_pvgis_data(latitude, longitude, two_axis_tracking=False,
     data = json.loads(response.content)
 
     # Save JSON data to file
+    # Ensure the directory exists
+    pvgis_filepath.parent.mkdir(parents=True, exist_ok=True)
     print('Save PVGIS data to file ' + pvgis_filepath.as_posix())
     with pvgis_filepath.open('w') as file:
         json.dump(data, file)
@@ -596,11 +596,11 @@ def get_int_gains(time, profile_path, bldg_area = None):
     mask = time.dayofweek < 5
     workday_idx = time[mask]
     weekend_idx = time[~mask]
-    df["qdot_oc"][workday_idx] = (profile["user [W/m^2]"][workday_idx.hour] * profile["workday_user"][workday_idx.hour]).values
-    df["qdot_app"][workday_idx] = (profile["appliances [W/m^2]"][workday_idx.hour] * profile["workday_appliances"][workday_idx.hour]).values
+    df.loc[workday_idx, "qdot_oc"] = (profile["user [W/m^2]"][workday_idx.hour] * profile["workday_user"][workday_idx.hour]).values
+    df.loc[workday_idx, "qdot_app"] = (profile["appliances [W/m^2]"][workday_idx.hour] * profile["workday_appliances"][workday_idx.hour]).values
     
-    df["qdot_oc"][weekend_idx] = (profile["user [W/m^2]"][weekend_idx.hour] * profile["weekend_user"][weekend_idx.hour]).values
-    df["qdot_app"][weekend_idx] = (profile["appliances [W/m^2]"][weekend_idx.hour] * profile["weekend_appliances"][weekend_idx.hour]).values
+    df.loc[weekend_idx, "qdot_oc"] = (profile["user [W/m^2]"][weekend_idx.hour] * profile["weekend_user"][weekend_idx.hour]).values
+    df.loc[weekend_idx, "qdot_app"] = (profile["appliances [W/m^2]"][weekend_idx.hour] * profile["weekend_appliances"][weekend_idx.hour]).values
 
     # total specific internal gains in W/m^2
     df["qdot_tot"] = df["qdot_oc"] + df["qdot_app"]

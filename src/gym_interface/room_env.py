@@ -127,14 +127,16 @@ class RoomHeatEnv(gym.Env):
         
         # Load weather data and 
         pos = self.building["position"]
-        parent_dir = os.path.dirname(os.path.dirname(__file__))
+        # Get repo root: go up 2 parent levels from src/gym_interface/room_env.py
+        from pathlib import Path
+        repo_root = Path(__file__).resolve().parents[2]
         self.weather_data = load_weather(pos["lat"], pos["long"], pos["altitude"], tz=pos['timezone'],
-                                         repo_filepath=parent_dir)
+                                         repo_filepath=str(repo_root))
         # self.T_amb = weather_data
         # Generate absolut heat gain profiles, based on datetime, building usage and floor area. 
         self.internal_gains_df = get_int_gains(
             time=self.weather_data.index,
-            profile_path=os.path.join(parent_dir, internal_gain_profile),
+            profile_path=str(repo_root / internal_gain_profile),
             bldg_area=self.building['area_floor'])
         Qdot_sol = get_solar_gains(weather = self.weather_data, bldg_params = self.building)
         Qdot_gains = pd.DataFrame(Qdot_sol + self.internal_gains_df['Qdot_tot'] , columns = ['Qdot_gains']) # calculate total gains
@@ -221,7 +223,7 @@ class RoomHeatEnv(gym.Env):
             bldg_area=self.building['area_floor'])
         Qdot_sol = get_solar_gains(weather = self.weather_data, bldg_params = self.building)
         Qdot_gains = pd.DataFrame(Qdot_sol + self.internal_gains_df['Qdot_tot'] , columns = ['Qdot_gains']) # calculate total gains
-        self.p = pd.concat([self.weather_data['T_amb'], Qdot_gains], axis = 1).astype(np.float32).resample(f'{self.timestep}S').pad() # Disturbances
+        self.p = pd.concat([self.weather_data['T_amb'], Qdot_gains], axis = 1).astype(np.float32).resample(f'{self.timestep}s').ffill() # Disturbances
         self.hp_model_name = hp_model
 
         self.weather_forecast_data = weather_forecast_profile

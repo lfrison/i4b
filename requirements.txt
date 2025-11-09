@@ -1,5 +1,5 @@
 casadi==3.7.2
-pvlib==0.9.0
+pvlib==0.13.1
 numpy==2.2.6
 pandas==2.3.3
 gymnasium==1.2.1

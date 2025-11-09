@@ -14,7 +14,7 @@ Construction period 1995 - 2001
 sfh_1995_2001_0_soc = {'H_ve': 62,            # [W/K]
                        'H_tr': 197,           # [W/K]
                        'H_tr_light' : 61.7 + 4, # [W/K]
-                       'c_bldg': 45,          # [Wh/(m^2K)] zweischaliges Mauerwerk - mittel nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 45,          # [Wh/(m^2K)] Double-shell masonry - medium (zweischaliges Mauerwerk - mittel) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 121.9,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_1995_2001_0_soc'}
@@ -49,7 +49,7 @@ sfh_1995_2001_0_soc['position'] = {'lat': 48.0252,
 sfh_1995_2001_1_enev = {'H_ve': 62,            # [W/K]
                         'H_tr': 156,           # [W/K]
                         'H_tr_light' : 42.2 + 2.6, # [W/K]
-                        'c_bldg': 45,          # [Wh/(m^2K)] zweischaliges Mauerwerk - mittel nach DIN EN ISO 13790 - Tabelle 12
+                        'c_bldg': 45,          # [Wh/(m^2K)] Double-shell masonry - medium (zweischaliges Mauerwerk - mittel) according to DIN EN ISO 13790 - Table 12
                         'area_floor': 121.9,   # [m^2]
                         'height_room': 2.5,    # [m]
                         'name': 'sfh_1995_2001_1_enev'}
@@ -84,7 +84,7 @@ sfh_1995_2001_1_enev['position'] = {'lat': 48.0252,
 sfh_1995_2001_2_kfw = {'H_ve': 52,             # [W/K]
                        'H_tr': 87,            # [W/K]
                        'H_tr_light' : 26 + 1.6, # [W/K]
-                       'c_bldg': 45,          # [Wh/(m^2K)] zweischaliges Mauerwerk - mittel nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 45,          # [Wh/(m^2K)] Double-shell masonry - medium (zweischaliges Mauerwerk - mittel) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 121.9,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_1995_2001_2_kfw'}

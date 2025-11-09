@@ -14,7 +14,7 @@ Construction period 2002 - 2009
 sfh_2002_2009_0_soc = {'H_ve': 62,            # [W/K]
                        'H_tr': 152,           # [W/K]
                        'H_tr_light' : 39.6 + 4, # [W/K]
-                       'c_bldg': 45,          # [Wh/(m^2K)] zweischaliges Mauerwerk - mittel nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 45,          # [Wh/(m^2K)] Double-shell masonry - medium (zweischaliges Mauerwerk - mittel) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 146.5,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_2002_2009_0_soc'}
@@ -49,7 +49,7 @@ sfh_2002_2009_0_soc['position'] = {'lat': 48.0252,
 sfh_2002_2009_1_enev = {'H_ve': 62,            # [W/K]
                         'H_tr': 128,           # [W/K]
                         'H_tr_light' : 36.8 + 2.6, # [W/K]
-                        'c_bldg': 45,          # [Wh/(m^2K)] zweischaliges Mauerwerk - mittel nach DIN EN ISO 13790 - Tabelle 12
+                        'c_bldg': 45,          # [Wh/(m^2K)] Double-shell masonry - medium (zweischaliges Mauerwerk - mittel) according to DIN EN ISO 13790 - Table 12
                         'area_floor': 146.5,   # [m^2]
                         'height_room': 2.5,    # [m]
                         'name': 'sfh_2002_2009_1_enev'}
@@ -84,7 +84,7 @@ sfh_2002_2009_1_enev['position'] = {'lat': 48.0252,
 sfh_2002_2009_2_kfw = {'H_ve': 62,            # [W/K]
                        'H_tr': 89,            # [W/K]
                        'H_tr_light' : 22.6 + 1.6, # [W/K]
-                       'c_bldg': 45,          # [Wh/(m^2K)] zweischaliges Mauerwerk - mittel nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 45,          # [Wh/(m^2K)] Double-shell masonry - medium (zweischaliges Mauerwerk - mittel) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 146.5,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_2002_2009_2_kfw'}

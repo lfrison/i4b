@@ -4,10 +4,20 @@ from cycler import cycler
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 from matplotlib.dates import DateFormatter
 
 # Set the default style
-plt.style.use('seaborn-whitegrid')
+# Use seaborn style if available, otherwise use matplotlib defaults with grid
+try:
+    plt.style.use('seaborn-v0_8-whitegrid')
+except:
+    # Fallback to matplotlib's whitegrid configuration
+    plt.style.use('default')
+    plt.rcParams['axes.grid'] = True
+    plt.rcParams['grid.linestyle'] = '-'
+    plt.rcParams['grid.alpha'] = 0.5
+    plt.rcParams['axes.facecolor'] = 'white'
 # Set the default font size
 plt.rcParams["font.size"] = 14
 plt.rcParams["font.weight"] = "bold"

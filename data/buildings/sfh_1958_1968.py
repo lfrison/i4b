@@ -14,7 +14,7 @@ Construction period 1958 - 1968
 sfh_1958_1968_0_soc = {'H_ve': 62,            # [W/K]
                        'H_tr': 496,           # [W/K]
                        'H_tr_light' : 75.9 + 6.3, # [W/K]
-                       'c_bldg': 30,          # [Wh/(m^2K)] Hohlziegel - leicht nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 30,          # [Wh/(m^2K)] Hollow brick - light (Hohlziegel - leicht) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 121.2,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_1958_1968_0_soc'}
@@ -49,7 +49,7 @@ sfh_1958_1968_0_soc['position'] = {'lat': 48.0252,
 sfh_1958_1968_1_enev = {'H_ve': 62,            # [W/K]
                         'H_tr': 205,           # [W/K]
                         'H_tr_light' : 35.2 + 2.7, # [W/K]
-                        'c_bldg': 30,          # [Wh/(m^2K)] Hohlziegel - leicht nach DIN EN ISO 13790 - Tabelle 12
+                        'c_bldg': 30,          # [Wh/(m^2K)] Hollow brick - light (Hohlziegel - leicht) according to DIN EN ISO 13790 - Table 12
                         'area_floor': 121.2,   # [m^2]
                         'height_room': 2.5,    # [m]
                         'name': 'sfh_1958_1968_1_enev'}
@@ -84,7 +84,7 @@ sfh_1958_1968_1_enev['position'] = {'lat': 48.0252,
 sfh_1958_1968_2_kfw = {'H_ve': 52,            # [W/K]
                        'H_tr': 102,           # [W/K]
                        'H_tr_light' : 21.7 + 1.7, # [W/K]
-                       'c_bldg': 30,          # [Wh/(m^2K)] Hohlziegel - leicht nach DIN EN ISO 13790 - Tabelle 12
+                       'c_bldg': 30,          # [Wh/(m^2K)] Hollow brick - light (Hohlziegel - leicht) according to DIN EN ISO 13790 - Table 12
                        'area_floor': 121.2,   # [m^2]
                        'height_room': 2.5,    # [m]
                        'name': 'sfh_1958_1968_2_kfw'}

@@ -35,6 +35,10 @@ For reinforcement learning examples and tools, install the optional extras:
 
 `pip install -r requirements-rl.txt`
 
+For Jupyter notebooks (located in `/notebooks`), install the optional notebook dependencies:
+
+`pip install -r notebooks/requirements-notebooks.txt`
+
 ## Building Models
 
 Geometrical and physical parameters that specify different buildings are available in the `/data/buildings` directory, including:

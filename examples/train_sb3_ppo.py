@@ -7,7 +7,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
 
 # Local imports
-from gym_interface import make_room_heat_env
+from src.gym_interface import make_room_heat_env
 
 
 def make_env_fn(args):
@@ -32,7 +32,7 @@ def make_env_fn(args):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--building', type=str, default='sfh_2016_now_0_soc')
-    parser.add_argument('--hp_model', type=str, default='HPbasic')
+    parser.add_argument('--hp_model', type=str, default='Heatpump_AW')
     parser.add_argument('--method', type=str, default='4R3C')
     parser.add_argument('--mdot_hp', type=float, default=0.25)
     parser.add_argument('--internal_gain_profile', type=str, default='data/profiles/InternalGains/ResidentialDetached.csv')
