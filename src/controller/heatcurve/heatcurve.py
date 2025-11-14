@@ -141,10 +141,10 @@ def tune_building_t_offset_and_mdot_hp(building, method='4R3C', t_offset_min=-15
 
     Tuple (best_t_offset, best_mdot)
     '''
-    from disturbances import load_weather, get_int_gains, get_solar_gains
-    import model_buildings
-    import model_hvac
-    import simulator
+    from src.disturbances import load_weather, get_int_gains, get_solar_gains
+    import src.models.model_buildings as model_buildings
+    import src.models.model_hvac as model_hvac
+    import src.simulator as simulator
 
     INT_GAIN_PROFILE = f'{repo_filepath}data/profiles/InternalGains/ResidentialDetached.csv'
     INITIAL_TEMP = 20 # °C

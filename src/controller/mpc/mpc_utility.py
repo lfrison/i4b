@@ -140,11 +140,42 @@ def init_file(columns,resultdir = "results_mpc",resultfile=None):
       print ('\n****** Result file: %s/%s.csv.' %(resultdir,resultfile))
       
       
-def update_file(time,resultfile,resultdir,P,uk,xk,P_el_kWh=None):
+def update_file(time,resultfile,resultdir,P,uk,xk,P_el_kWh=None,xk_obs=None):
+   """Update results CSV file with current timestep data.
+   
+   Parameters
+   ----------
+   time : float
+       Current simulation time
+   resultfile : str
+       Results filename
+   resultdir : str
+       Results directory
+   P : ndarray
+       Parameter matrix (disturbances)
+   uk : ndarray
+       Control input
+   xk : ndarray
+       True state vector
+   P_el_kWh : float, optional
+       Electrical power consumption in kWh
+   xk_obs : ndarray, optional
+       Noisy observed state vector (what MPC sees)
+   """
    nx = xk.shape[0]
-   res_arr = np.column_stack((time,np.reshape(xk[:nx],(1,nx)),uk,np.reshape(P[0,:],(1,P.shape[1]))))
+   res_arr = np.column_stack((time,np.reshape(xk[:nx],(1,nx))))
+   
+   # Add noisy observations if provided
+   if xk_obs is not None:
+       res_arr = np.column_stack((res_arr, np.reshape(xk_obs[:nx],(1,nx))))
+   
+   # Add control and disturbances
+   res_arr = np.column_stack((res_arr, uk, np.reshape(P[0,:],(1,P.shape[1]))))
+   
+   # Add power consumption
    if P_el_kWh is not None:
        res_arr = np.column_stack((res_arr, P_el_kWh))
+   
    df_mpc = pd.DataFrame(data=res_arr)
    df_mpc.to_csv('%s/%s.csv' % (resultdir,resultfile), header=False,mode='a',index=None) 
   

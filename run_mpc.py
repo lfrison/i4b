@@ -85,11 +85,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--building", type=str,
-        default="sfh_1958_1968:sfh_1958_1968_0_soc",
-        help="Building as 'module:attribute' under data.buildings"
+        default="sfh_1958_1968_0_soc",
+        help="Building name (e.g., 'sfh_1958_1968_0_soc', 'i4c')"
     )
     parser.add_argument(
-        "--t_lower_night", type=float, default=18.0,
+        "--t_lower_night", type=float, default=20.0,
         help="Night setback lower room setpoint [C]"
     )
     parser.add_argument(
@@ -107,13 +107,13 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def select_building(building_key: str):
+def select_building(building_name: str):
     """Load building parameters from data.buildings module.
     
     Parameters
     ----------
-    building_key : str
-        Building specification as 'module:attribute'
+    building_name : str
+        Building name (e.g., 'sfh_1958_1968_0_soc', 'i4c')
         
     Returns
     -------
@@ -122,40 +122,51 @@ def select_building(building_key: str):
         
     Raises
     ------
-    ValueError
-        If building_key format is invalid
     AttributeError
-        If specified attribute does not exist in module
+        If building does not exist
+        
+    Notes
+    -----
+    Available buildings include:
+    - i4c
+    - sfh_XXXX_YYYY_Z_type where:
+      - XXXX_YYYY: construction period
+      - Z: 0 (soc), 1 (enev), 2 (kfw)
     """
-    if ":" not in building_key:
-        raise ValueError(
-            "--building must be provided as 'module:attribute' "
-            "under data.buildings, e.g., "
-            "'sfh_1958_1968:sfh_1958_1968_0_soc'"
-        )
-    module_name, attr_name = building_key.split(":", 1)
-    module = importlib.import_module(f"data.buildings.{module_name}")
-    if not hasattr(module, attr_name):
+    import data.buildings
+    
+    # Support legacy format "module:attribute" for backward compatibility
+    if ":" in building_name:
+        _, building_name = building_name.split(":", 1)
+    
+    if not hasattr(data.buildings, building_name):
+        available = sorted([b for b in data.buildings.__all__ 
+                          if not b.startswith('_')])
         raise AttributeError(
-            f"Module data.buildings.{module_name} "
-            f"has no attribute {attr_name}"
+            f"Building '{building_name}' not found.\n"
+            f"Available buildings: {', '.join(available[:5])}... "
+            f"(total: {len(available)})"
         )
-    return getattr(module, attr_name)
+    
+    return getattr(data.buildings, building_name)
 
 
-def get_column_names(method: str) -> list:
+def get_column_names(method: str, include_noisy: bool = False) -> list:
     """Get CSV column names based on building model method.
     
     Parameters
     ----------
     method : str
         Building thermal model type ('2R2C', '4R3C', or '5R4C')
+    include_noisy : bool
+        If True, include noisy observation columns
         
     Returns
     -------
     list
         Column names for the results CSV file
     """
+    # True state columns
     base_cols = ['time', 'T_room']
     if method == '5R4C':
         state_cols = ['T_int', 'T_wall']
@@ -166,11 +177,25 @@ def get_column_names(method: str) -> list:
     else:
         raise ValueError(f"Unsupported method: {method}")
     
+    true_state_cols = base_cols + state_cols + ['T_return']
+    
+    # Noisy observation columns (what MPC sees)
+    noisy_cols = []
+    if include_noisy:
+        noisy_cols = ['T_room_obs']
+        if method == '5R4C':
+            noisy_cols += ['T_int_obs', 'T_wall_obs']
+        elif method == '4R3C':
+            noisy_cols += ['T_wall_obs']
+        noisy_cols += ['T_return_obs']
+    
+    # Control and disturbances
     remaining_cols = [
-        'T_return', 'T_HP', 'T_amb', 'Qdot_gains',
+        'T_HP', 'T_amb', 'Qdot_gains',
         'T_room_set_lower', 'grid_signal', 'P_el_kWh'
     ]
-    return base_cols + state_cols + remaining_cols
+    
+    return true_state_cols + noisy_cols + remaining_cols
 
 
 def compute_power_consumption(uk, xk, P, hp_model, h):
@@ -275,13 +300,14 @@ def main() -> None:
         raise ValueError(f"Unsupported method: {method}")
 
     # Set-up result file
-    columns = get_column_names(method)
+    include_noisy = args.noise > 0
+    columns = get_column_names(method, include_noisy=include_noisy)
     resultdir = args.results_dir
     resultfile = (
         f"results_{building_params['name']}_"
         f"days{int(mpc_steps/(24*int(3600/h)))}_"
         f"prediction{int(nk/int(3600/h))}h_"
-        f"h{h}_noise_{args.noise:f}"
+        f"h{h}_noise_{args.noise:f}_seed{args.seed}"
     )
     util.init_file(columns, resultdir, resultfile)
 
@@ -346,11 +372,8 @@ def main() -> None:
     # Resample to control step
     p = p_hourly.resample(f'{h}S').ffill()
 
-    # Initial state vector
-    xk_dict = {key: 18 for key in building_model.state_keys}
-    if method != '2R2C':
-        xk_dict['T_wall'] = 15
-    xk_dict['T_hp_ret'] = 22
+    # Initial state vector (matching gym environment: 20°C for all temperatures)
+    xk_dict = {key: 20.0 for key in building_model.state_keys}
     xk_next = np.array(list(xk_dict.values()))
 
     # MPC iteration loop
@@ -362,17 +385,19 @@ def main() -> None:
         P = p[idx_start:idx_end].values
 
         # Add noise to disturbances if specified
+        xk_obs = None  # Noisy observation (what MPC sees)
         if args.noise > 0:
             P_noisy = add_noise_to_disturbances(P, args.noise)
             xk_mpc = xk_next + np.random.normal(
                 0, args.noise, size=xk_next.shape
             )
+            xk_obs = xk_mpc.copy()  # Store noisy observation for logging
         else:
             P_noisy = P
             xk_mpc = xk_next
 
         # Solve MPC optimization problem
-        xk = xk_next
+        xk = xk_next  # Store true previous state
         mpc.update_NLP(xk_mpc)
         uk, xk_next = mpc.solve_NLP(P_noisy, mpc_steps <= 1)
 
@@ -387,8 +412,10 @@ def main() -> None:
 
         # Compute and log power consumption
         E_el_kWh = compute_power_consumption(uk, xk, P, hp_model, h)
+        
+        # Log both true state and noisy observation (if noise enabled)
         util.update_file(
-            i * h, mpc.resultfile, mpc.resultdir, P, uk, xk, E_el_kWh
+            i * h, mpc.resultfile, mpc.resultdir, P, uk, xk, E_el_kWh, xk_obs=xk_obs
         )
 
     # Print results

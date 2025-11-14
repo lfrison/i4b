@@ -136,7 +136,7 @@ class Heatpump_Vitocal(Heatpump):
             COP
         """
         # estimation of ground temperature based on ambient temperature
-        from disturbances import t_ground_from_amb
+        from src.disturbances import t_ground_from_amb
         T_source = t_ground_from_amb(T_amb)
     
         z0 = 10.893436
