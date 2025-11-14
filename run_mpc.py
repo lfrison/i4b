@@ -314,7 +314,7 @@ def main() -> None:
     # Define MPC solver
     mpc = MPC_solver(
         resultdir, resultfile, hp_model, building_model,
-        nx=nx, npar=npar, h=h, nk=nk, nc=nc, ns=ns
+        nx=nx, npar=npar, h=h, nk=nk, nc=nc, ns=ns, ws=0.1
     )
 
     # Load weather and disturbances
