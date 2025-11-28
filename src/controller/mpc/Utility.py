@@ -6,7 +6,7 @@ from pathlib import Path
 from shutil import copyfile
 
    
-def evaluate_mpc(hp_model,building_model,resultfile='results_mpc',resultdir=None,nsamples=0,offset=0,h=900,mfig=(12,4)):
+def evaluate_mpc(hp_model,building_model,resultfile='results_mpc',resultdir=None,nsamples=0,offset=0,h=900,mfig=(10,3)):
    df_data = pd.read_csv('%s/%s.csv'%(resultdir,resultfile), sep=',', header='infer')
    if nsamples==0: nsamples = len(df_data)
    time = range(0,nsamples*h,h)
@@ -72,9 +72,7 @@ def evaluate_mpc(hp_model,building_model,resultfile='results_mpc',resultdir=None
    ax0.legend()
    plot(fig,ax,plt,h*nsamples)
 
-   
- 
-    
+  
 def evaluate_ocp(res,dim,nk,h,P,hp_model,building_model,mfig=0):
    d = dim['d']
    nx = dim['nx']

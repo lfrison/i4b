@@ -25,7 +25,7 @@ if str(I4B_ROOT) not in sys.path:
     sys.path.insert(0, str(I4B_ROOT))
 
 from src.controller.mpc.casadi_framework import MPC_solver            
-import src.controller.mpc.mpc_utility as util
+import src.controller.mpc.Utility as util
 from timeit import default_timer as timer
 
 import src.simulator as simulator

@@ -2,7 +2,7 @@ import casadi as cas
 import numpy as np
 
 
-import src.controller.mpc.mpc_utility as util
+import src.controller.mpc.Utility as util
 import src.controller.mpc.optimization_problem as optimization_problem
 
 
