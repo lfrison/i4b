@@ -2,12 +2,19 @@
 import argparse
 import os
 
-import gymnasium as gym
 import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv
 import torch
+import sys
+from pathlib import Path
+
+# Ensure local i4b root is on the path when running from repo root
+I4B_ROOT = Path(__file__).resolve().parents[1]
+if str(I4B_ROOT) not in sys.path:
+    sys.path.insert(0, str(I4B_ROOT))
+
 # Local imports
 from src.gym_interface import make_room_heat_env
 
@@ -164,6 +171,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
 
