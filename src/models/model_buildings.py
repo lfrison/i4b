@@ -6,25 +6,11 @@ import src.models.model_hvac
 import src.simulator
 import casadi as cas
 
-# generic constants
-RHO_WATER = 997      # Density water [kg/m3]
-RHO_AIR = 1.225      # Density air [kg/m3]
-C_WATER_SPEC = 4181  # Spec. heat capacity of water [J/kg/K]
-C_AIR_SPEC = 1.005   # Spec. heat capacity of air [J/kg/K]
-
-# Specify building constants
-C_INT_SPEC = 10000    # [J/m^2/K]
-H_UFH_SPEC = 4.4      # [W/m^2/K]
-H_UFH_SURF_SPEC = 10.8 # W/m^2/K
-V_TS_SPEC  = 5        # [l/m^2]
-V_UFH_SPEC = 1.5      # [l/m^2]
-R_SI       = 0.13     # [m^2*K/W]
-h_tr_int   = 9.1      # [W/(m^2K)] heattransfer coefficient between building mass and indoor surface ISO13790 12.2.2
-h_air2surf = 3.45     # [W/(m^2K)] heattransfer coefficient between indoor surface and indoor air ISO13790 7.2.2.2
-c_P_screed = 1000 # specific heat capacity of screed [J/(kgK)] source: https://www.schweizer-fn.de/stoff/wkapazitaet/wkapazitaet_baustoff_erde.php
-d_screed = 50     # thickness of screed for UFH [mm] source: https://www.kesselheld.de/heizestrich/
-rho_screed = 2000 # dry bulk density of screed (original German: Trockenrohdichte) [kg/m^3] source: https://www.profibaustoffe.com/wp-content/files/TD_2059_2056_ESTRICH-CT-C20-F4-E225-MIT-FASERN_041119.pdf
-
+from src.constants import (
+    RHO_WATER, RHO_AIR, C_WATER_SPEC, C_AIR_SPEC,
+    C_INT_SPEC, H_UFH_SPEC, H_UFH_SURF_SPEC, V_TS_SPEC, V_UFH_SPEC,
+    R_SI, H_TR_INT, H_AIR2SURF, C_P_SCREED, D_SCREED, RHO_SCREED
+)
 
 class Building:
     """ With the building class, a bulding model can be generated from pysical and geometrical parameters as specified in the data/buildings directory.
@@ -46,14 +32,14 @@ class Building:
         - C_INT_SPEC = 10000 J/m^2/K    : Spec heat capacitiy of interior acc. to ISO52016 Tab. B17
         - H_UFH_SPEC = 4.4 W/m^2/K      : Spec heat transmission coefficient for underfloor heating acc. to `Daniel Rüdiser <https://www.htflux.com/en/dynamic-simulation-and-comparison-of-two-underfloor-heating-systems/>`_
         - H_UFH_SURF_SPEC = 10.8 W/m^2/K : Spec heat convection from floor to air with underfloor heating system acc to EN 1264-5
-        - V_TS_SPEC = 5 l/m^2           : Spec volume of thermal heat storage per heated floor area acc. to DGS – German Society for Solar Energy (original German: Deutsche Gesellschaft für Sonnenenergie). Guide to Solar Thermal Systems – Expert Presentation on DVD, 9th Edition (original German: Leitfaden Solarthermische Anlagen – Experten-Vortrag auf DVD, 9. Auflage)
+        - V_TS_SPEC = 5 l/m^2           : Spec volume of thermal heat storage per heated floor area acc. to DGS – German Society for Solar Energy. Guide to Solar Thermal Systems – Expert Presentation on DVD, 9th Edition
         - V_UFH_SPEC = 1.5 l/m^2        : Spec volume of water in underfloor heating system per heated floor area acc. to `BaCoGa Technik GmBH <https://www.bacoga.com/wp-content/uploads/2013/02/Volumenberechnung.pdf>`_
         - R_SI = 0.13 m^2*K/W           : Heat resistance of internal surfaces acc. to DIN EN ISO 6946 Tabelle 7. 
         - h_tr_int = 9.1 W/(m^2K)       : Heattransfer coefficient between building mass and indoor surface ISO13790 12.2.2
         - h_air2surf = 3.45 W/(m^2K)    : Heattransfer coefficient between indoor surface and indoor air ISO13790 7.2.2.2
         - c_P_screed = 1000 # specific heat capacity of screed [J/(kgK)] source: https://www.schweizer-fn.de/stoff/wkapazitaet/wkapazitaet_baustoff_erde.php
         - d_screed = 50     # thickness of screed for UFH [mm] source: https://www.kesselheld.de/heizestrich/
-        - rho_screed = 2000 # dry bulk density of screed (original German: Trockenrohdichte) [kg/m^3] source: https://www.profibaustoffe.com/wp-content/files/TD_2059_2056_ESTRICH-CT-C20-F4-E225-MIT-FASERN_041119.pdf
+        - rho_screed = 2000 # dry bulk density of screed [kg/m^3] source: https://www.profibaustoffe.com/wp-content/files/TD_2059_2056_ESTRICH-CT-C20-F4-E225-MIT-FASERN_041119.pdf
 
     Attributes
     ----------
@@ -522,8 +508,8 @@ class Building:
         Qdot_gain2mass = self.params['A_mass']/self.params['A_surf'] * (0.5 * Qdot_int + Qdot_sol) # [W]
         Qdot_gain2surf = (1 - (self.params['A_mass'] / self.params['A_surf']) - (self.params['H_tr_light']/(9.1 * self.params['A_surf']))) * (0.5 * Qdot_int + Qdot_sol) # [W]
 
-        H_air2surf = h_air2surf * self.params['A_surf'] # [W/K]
-        H_tr_int = h_tr_int * self.params['A_mass'] # [W/K] 
+        H_air2surf = H_AIR2SURF * self.params['A_surf'] # [W/K]
+        H_tr_int = H_TR_INT * self.params['A_mass'] # [W/K] 
         H_tr_ext = 1 / ((1/self.params['H_tr_heavy']) - (1/H_tr_int))
 
         Qdot_tr_int = H_tr_int * (T_surf - T_mass) # [W]
@@ -579,7 +565,7 @@ class Building:
             - rhs[2] placeholder for operative temperature 
             - rhs[3] of dT_mass/dt        : building mass temperature [degC/s]
             - rhs[4] of dT_surf_floor/dt  : floor surface temperature [degC/s]
-            - rhs[4] of dT_hp_ret/dt      : return flow temperature [degC/s]
+            - rhs[5] of dT_hp_ret/dt      : return flow temperature [degC/s]
         
         Notes
         -----
@@ -650,8 +636,8 @@ class Building:
         Qdot_gain2surf_floor = f_floor * Qdot_gain2surf
         Qdot_gain2surf_wall = (1-f_floor) * Qdot_gain2surf
 
-        H_air2surf_wall = h_air2surf * self.params['A_surf'] * (1 - f_floor) # [W/K]
-        H_tr_int = h_tr_int * self.params['A_mass'] # [W/K] 
+        H_air2surf_wall = H_AIR2SURF * self.params['A_surf'] * (1 - f_floor) # [W/K]
+        H_tr_int = H_TR_INT * self.params['A_mass'] # [W/K] 
         H_tr_ext = 1 / ((1/self.params['H_tr_heavy']) - (1/H_tr_int))
 
         Qdot_tr_int = H_tr_int * (T_surf_wall - T_mass) # [W]

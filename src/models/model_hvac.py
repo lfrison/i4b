@@ -1,18 +1,18 @@
 import numpy as np
+from src.constants import C_WATER_SPEC
    
 class Heatpump:
     """ Heat pump super class
     """
     def __init__(self, mdot_HP = 0.25):       # heatpump nominal mass flow 
         self.mdot_HP = mdot_HP
-        self.c_water = 4181      # heat capacity of water [J/kg/K]
+        self.c_water = C_WATER_SPEC      # heat capacity of water [J/kg/K]
     
     def check_hp(self,T_HP,T_RL):
         """ Ensures that selected HP power is within controller bounds in order to 
         exclude invalid choices (which would result in system errors).
         """    
         Q_HP = self.mdot_HP*self.c_water*(T_HP-T_RL)
-        #if Q_HP<0: print('WARNING in building class: negative Q_HP=%.2f, T_HP=%.2f, T_RL=%.2f, T_amb=%.2f'%(Q_HP,T_HP,T_RL,T_amb))
         
         Q_HP_min = 2000 # minimum power in W
         Q_HP_max = 60000 # maximum power in W
@@ -30,7 +30,8 @@ class Heatpump:
 
 
     def calc(self, T_hp_ret, T_hp_sup, T_amb, timestep):
-        """ Calculate electrical and thermal performance of the heat pump for a given timestep. 
+        """
+        Calculate electrical and thermal performance of the heat pump for a given timestep. 
 
         Parameters
         ----------
@@ -46,7 +47,7 @@ class Heatpump:
         Returns
         -------
         dict
-            - E_el    (float) - :math:`E_{el}` : Electrical energy demand [kWh]
+            - E_el    (float) - :math:`E_{el}` : Electrical energy demand [Wh]
             - P_el    (float) - :math:`P_{el}` : Electric power [W]
             - COP     (float) - :math:`COP` : Coefficient of performance [-]
             - Qdot_th (float) - :math:`\dot{Q}_{el}` : Thermal power [W]
@@ -210,12 +211,6 @@ class Heatpump_AW(Heatpump):
             - Lower operating limit heat source (heating mode) / Upper operating limit heat source (heating mode) -22 / 35 °C
             - Heating capacity from 2.28..8.04 kW
         
-        Original German text (for reference):
-        Die Parametrierung des Wärmepumpenmodells erfolgte anhand der Herstellerdaten der Dimplex LA 6TU Luft/Wasser-Wärmepumpe.
-        Dieses Modell wurde ausgewählt, weil es zum einen in der BAFA-Liste aufgeführt wird und dort bezüglich des COPs im Mittelfeld rangiert.
-            - Rücklauftemperatur min. / Vorlauftemperatur max. 7) 18 / 60 °C +/- 2
-            - Untere Einsatzgrenze Wärmequelle (Heizbetrieb) / Obere Einsatzgrenze Wärmequelle (Heizbetrieb) -22 / 35 °C
-            - Heizleistung von 2.28..8.04
     """
     def __init__(self, 
                  mdot_HP = 0.25,      # heatpump nominal mass flow 

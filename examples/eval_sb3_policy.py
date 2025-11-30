@@ -1,20 +1,10 @@
 """Evaluation script for trained PPO agent on room heating control task."""
 import argparse
 import os
-import sys
-from pathlib import Path
-
 import numpy as np
 import torch
 from stable_baselines3 import PPO
-
-# Ensure local i4b root is on the path when running from repo root
-I4B_ROOT = Path(__file__).resolve().parents[1]
-if str(I4B_ROOT) not in sys.path:
-    sys.path.insert(0, str(I4B_ROOT))
-    
 from src.gym_interface import make_room_heat_env
-
 
 def evaluate(model, env, num_episodes=5):
     returns = []

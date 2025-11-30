@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import os
 from pathlib import Path
 from shutil import copyfile
+from src.utils import plot
 
    
 def evaluate_mpc(hp_model,building_model,resultfile='results_mpc',resultdir=None,nsamples=0,offset=0,h=900,mfig=(10,3)):
@@ -71,8 +72,7 @@ def evaluate_mpc(hp_model,building_model,resultfile='results_mpc',resultdir=None
    ax.legend()
    ax0.legend()
    plot(fig,ax,plt,h*nsamples)
-
-  
+    
 def evaluate_ocp(res,dim,nk,h,P,hp_model,building_model,mfig=0):
    d = dim['d']
    nx = dim['nx']
@@ -287,21 +287,6 @@ def read_data_hil(mpc_steps,inputfile,res_new=.25,res_old=0.25,scale=1,scale_gri
    
    plot_data(data)
    return data
-   """
-   def add_noise(self,data):
-      num = data.shape[0]
-      #print ('Data before noise:',data[:5],data[-5:])  
-      noise = np.random.standard_normal(size=(num))*.1
-      factor = [i**1.5 for i in range(num)]
-      #print ('Data after noise:',data[:5],data[-5:])   
-
-         self.grid.append(noise_vec)
-         df = pd.DataFrame(self.grid)
-         df.to_csv('%s/noise_%s.csv' 
-                   %(self.resultdir,self.resultfile), index=False, header=False)
-         
-   return noise*factor*np.mean(data)
-   """
    
 def plot_data(data,nk=24,h=3600,mfig=10):      
     print ('Load: mean=%.3fkW, max=%.3fkW, min=%.3fkW.' 
@@ -321,23 +306,6 @@ def plot_data(data,nk=24,h=3600,mfig=10):
     plt.show()   
 
    
-def plot(fig,ax,plt,tf,savename=None, folder="figures"):
-   if tf>86400:
-      step=86400
-      ax.set_xlabel('time [d]')
-   else:
-      step=3600
-      ax.set_xlabel('Zeit in h')
-      #ax.set_xlabel('time [h]')
-   #ax.legend();
-   ax.set_xlim([0,tf])
-   n=int(tf/step)
-   plt.xticks([scale*step for scale in range(n+1)],['%i'%scale for scale in range(n+1)])
-   plt.show()   
-   
-   if savename is not None:
-      if folder is not None and not os.path.exists(folder):
-         os.mkdir(folder)
-      fig.savefig('%s/%s.png' % (folder,savename),bbox_inches='tight')
+
       
        

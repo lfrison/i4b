@@ -9,14 +9,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from src.constants import RHO_WATER, RHO_AIR, C_WATER_SPEC, C_AIR_SPEC
+
 # Specify material parameters
-
-RHO_WATER = 997      # Density water [kg/m3]
-RHO_AIR = 1.225      # Density air [kg/m3]
-C_WATER_SPEC = 4181  # Spec. heat capacity of water [J/kg/K]
-C_AIR_SPEC = 1.005   # Spec. heat capacity of air [J/kg/K]
-
-
 def evaluate_results(x_arr, T_HP, T_amb, Q_HP, h=3600):   
     """Plot key simulation results.
 
@@ -102,49 +97,26 @@ def read_weather_data(input_file, h):
    return df_data['T_amb']
 
 
-def plot(fig, ax, plt, tf):
+def plot(fig, ax, plt, tf, savename=None, folder="figures"):
    if tf > 86400:
       step=86400
       ax.set_xlabel('time [d]')
    else:
       step=3600
       ax.set_xlabel('time [h]')
-   #ax.legend();
+
    ax.set_xlim([0,tf])
    n = int(tf/step)
    plt.xticks([scale*step for scale in range(n+1)], ['%i' % scale for scale in range(n+1)])
    plt.show()   
+   
+   if savename is not None:
+      if folder is not None and not os.path.exists(folder):
+         os.mkdir(folder)
+      fig.savefig('%s/%s.png' % (folder,savename),bbox_inches='tight')   
      
 
-class LocalColor:
-   def __init__(self, c='green', a=0.5):
-       self.c = c
-       self.a = max(0.0, min(1.0, a))
 
-       if self.c=='green':
-           self.c = (177./256., 200./256., 0./256., self.a)
-           self.ci = (177, 200, 0)
-           self.s = "#%02X%02X%02X" % self.ci
-       elif self.c=='grey':
-           self.c = (168./256., 175./256., 175./256., self.a)
-           self.ci = (168, 175, 175)
-           self.s = "#%02X%02X%02X" % self.ci
-       elif self.c=='orange':
-           self.c = (235./256., 106./256., 10./256., self.a)
-           self.ci = (235, 106, 10)
-           self.s = "#%02X%02X%02X" % self.ci
-       elif self.c=='darkblue':
-           self.c = (0./256., 110./256., 146./256., self.a)
-           self.ci = (0, 110, 146)
-           self.s = "#%02X%02X%02X" % self.ci
-       elif self.c=='blue':
-           self.c = (37./256., 186./256., 226./256., self.a)
-           self.ci = (37, 186, 226)
-           self.s = "#%02X%02X%02X" % self.ci
-       else:  # FhG RGB
-           self.c = (23./256., 156./256., 125./256., self.a)
-           self.ci = (23, 156, 125)
-           self.s = "#%02X%02X%02X" % self.ci
 
 
     

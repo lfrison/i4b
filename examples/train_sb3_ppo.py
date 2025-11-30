@@ -1,45 +1,32 @@
 """Training script for PPO agent on room heating control task."""
 import argparse
 import os
-
+import gymnasium as gym
 import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv
 import torch
-import sys
-from pathlib import Path
-
-# Ensure local i4b root is on the path when running from repo root
-I4B_ROOT = Path(__file__).resolve().parents[1]
-if str(I4B_ROOT) not in sys.path:
-    sys.path.insert(0, str(I4B_ROOT))
-
-# Local imports
 from src.gym_interface import make_room_heat_env
 
-
 def make_env_fn(args):
-    def _thunk():
-        env = make_room_heat_env(
-            building=args.building,
-            hp_model=args.hp_model,
-            method=args.method,
-            mdot_HP=args.mdot_hp,
-            internal_gain_profile=args.internal_gain_profile,
-            weather_forecast_steps=[1, 2, 3] if args.forecast else [],
-            timestep=args.timestep,
-            days=args.days,
-            random_init=args.random_init,
-            goal_based=args.goal_based,
-            goal_temp_range=(args.goal_temp_min, args.goal_temp_max),
-            temp_deviation_weight=args.temp_deviation_weight,
-            noise_level=args.obs_noise,
-        )
-        env = Monitor(env)
-        return env
-    return _thunk
-
+    env = make_room_heat_env(
+        building=args.building,
+        hp_model=args.hp_model,
+        method=args.method,
+        mdot_HP=args.mdot_hp,
+        internal_gain_profile=args.internal_gain_profile,
+        weather_forecast_steps=[1, 2, 3] if args.forecast else [],
+        timestep=args.timestep,
+        days=args.days,
+        random_init=args.random_init,
+        goal_based=args.goal_based,
+        goal_temp_range=(args.goal_temp_min, args.goal_temp_max),
+        temp_deviation_weight=args.temp_deviation_weight,
+        noise_level=args.obs_noise,
+    )
+    env = Monitor(env)
+    return env
 
 def main():
     """Main training loop."""
@@ -144,7 +131,6 @@ def main():
         torch.cuda.manual_seed(args.seed)
         print(f"GPU: {torch.cuda.get_device_name(0)}")
     
-
     # Create environment
     os.makedirs(args.logdir, exist_ok=True)
     env = DummyVecEnv([make_env_fn(args)])

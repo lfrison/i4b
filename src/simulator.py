@@ -4,7 +4,6 @@
 import numpy as np
 import pandas as pd
 import random
-
 from scipy.integrate import solve_ivp
 
 class Model_simulator:
@@ -68,16 +67,16 @@ class Model_simulator:
         input_values = [[input_dict[key] for key in input_keys]]
         
         # Compute next state
-        ode_result_obj = solve_ivp(self.bldg_model.calc, #model.dynamics,
+        ode_result_obj = solve_ivp(self.bldg_model.calc,
                                    [0, self.timestep],
                                    x_init_np,
                                    args = input_values,
                                    method = 'LSODA')
         """ Integration method to use:
-        'RK45' (default): Explicit Runge-Kutta method of order 5(4) [1]. The error is controlled assuming accuracy of the fourth-order method, but steps are taken using the fifth-order accurate formula (local extrapolation is done). A quartic interpolation polynomial is used for the dense output [2]. Can be applied in the complex domain.
-        'LSODA': Adams/BDF method with automatic stiffness detection and switching [7], [8]. This is a wrapper of the Fortran solver from ODEPACK.
+        'RK45' : Explicit Runge-Kutta method of order 5(4) [1]. The error is controlled assuming accuracy of the fourth-order method, but steps are taken using the fifth-order accurate formula (local extrapolation is done). A quartic interpolation polynomial is used for the dense output [2]. Can be applied in the complex domain.
+        'LSODA' (default): Adams/BDF method with automatic stiffness detection and switching [7], [8]. This is a wrapper of the Fortran solver from ODEPACK.
         """
-      
+
         if ode_result_obj.success is False:
             print(ode_result_obj.message)
 
@@ -294,7 +293,7 @@ def main():
     from pathlib import Path
     
     # Ensure the root of your package is in the PYTHONPATH
-    root_path = str(Path(__file__).resolve().parent)
+    root_path = str(Path(__file__).resolve().parent.parent)
     print(root_path)
     sys.path.insert(0, root_path)
     
