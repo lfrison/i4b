@@ -1,0 +1,31 @@
+total_timesteps: 960000
+episode_len: 34944
+train_env:
+  env_name: RoomHeat1-v1
+  hp_model: Heatpump_Vitocal
+  building: sfh_1919_1948_1_enev
+  mdot_HP: 0.25
+  internal_gain_profile: data/profiles/InternalGains/ResidentialDetached.csv
+  days: 1
+  reward_function_idx: 1
+  delta_t: 900
+  noise_level: 0.5
+  method: 4R3C
+  random_init: True
+  env_kwargs: {}
+  num_env: ${num_env}
+
+  
+eval_env:
+  env_name: RoomHeat1-v1
+  hp_model: Heatpump_Vitocal
+  building: sfh_1919_1948_1_enev
+  mdot_HP: 0.25
+  internal_gain_profile: data/profiles/InternalGains/ResidentialDetached.csv
+  days: 364
+  reward_function_idx: 1
+  delta_t: 900
+  noise_level: 0.5
+  random_init: False
+  method: 4R3C
+  env_kwargs: {}
