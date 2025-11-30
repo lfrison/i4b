@@ -39,7 +39,7 @@ class RoomHeatEnv(gym.Env):
         internal_gain_profile: str,
         weather_forecast_steps: List[int] = [],
         # Simulation parameters
-        timestep: int = 3600,
+        delta_t: int = 900,
         days: int = None,
         random_init: bool = False,
         # Goal-based learning parameters
@@ -71,9 +71,9 @@ class RoomHeatEnv(gym.Env):
         internal_gain_profile : str
             Relative path to internal gains profile CSV under the repo root.
         weather_forecast_steps : List[int]
-            Steps ahead (in multiples of timestep) to append T_amb forecasts.
-        timestep : int
-            Sampling interval in seconds.
+            Steps ahead (in multiples of delta_t) to append T_amb forecasts.
+        delta_t : int
+            Sampling interval in seconds (default: 3600).
         days : int
             Episode length in days. If None, uses full available length.
         random_init : bool
@@ -100,7 +100,7 @@ class RoomHeatEnv(gym.Env):
         super(RoomHeatEnv, self).__init__()
 
         # Core simulation parameters
-        self.timestep = timestep
+        self.delta_t = delta_t  # Store internally as timestep for compatibility
         self.method = method
         self.cost_dim = cost_dim
         self.noise_level = noise_level
@@ -133,7 +133,7 @@ class RoomHeatEnv(gym.Env):
         self.simulator = Model_simulator(
             hp_model=self.hp_model,
             bldg_model=self.bldg_model,
-            timestep=self.timestep,
+            timestep=self.delta_t,
         )
         
         # Define action space: normalized to [-1, 1]
@@ -196,7 +196,7 @@ class RoomHeatEnv(gym.Env):
         self.p = pd.concat(
             [self.weather_data['T_amb'], Qdot_gains],
             axis=1
-        ).astype(np.float32).resample(f'{self.timestep}s').ffill()
+        ).astype(np.float32).resample(f'{self.delta_t}s').ffill()
 
     def _create_observation_space(self) -> spaces.Box:
         """Create observation space based on configuration."""
@@ -239,7 +239,7 @@ class RoomHeatEnv(gym.Env):
         if self.days is None:
             return len(self.p) - 1
         
-        max_t = self.days * 24 * int(3600 / self.timestep)
+        max_t = self.days * 24 * int(3600 / self.delta_t)
         if max_t >= len(self.p):
             raise ValueError(
                 f"Maximum timesteps ({max_t}) exceeds available data length ({len(self.p)})"
@@ -479,7 +479,7 @@ class RoomHeatEnv(gym.Env):
         self.simulator = Model_simulator(
             hp_model=self.hp_model,
             bldg_model=self.bldg_model,
-            timestep=self.timestep,
+            timestep=self.delta_t,
         )
         
         # Reload disturbances
@@ -497,7 +497,7 @@ class RoomHeatEnv(gym.Env):
         self.p = pd.concat(
             [self.weather_data['T_amb'], Qdot_gains],
             axis=1
-        ).astype(np.float32).resample(f'{self.timestep}s').ffill()
+        ).astype(np.float32).resample(f'{self.delta_t}s').ffill()
         
         self.reset()
             

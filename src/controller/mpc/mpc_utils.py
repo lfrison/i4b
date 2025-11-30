@@ -30,9 +30,13 @@ def evaluate_mpc(hp_model,building_model,resultfile='results_mpc',resultdir=None
    Pth_HP = hp_model.mdot_HP*hp_model.c_water*(T_HP-T_return)/1000
    Pel_HP = Pth_HP/cop
       
-   T_lower = df_data['T_room_set_lower'] #building_model.T_room_set_lower
-   arr = np.max(np.column_stack((T_lower*np.ones(nsamples)-T_room,np.zeros(nsamples))),1) 
-   arrsum = np.sum(arr)
+   T_lower = df_data['T_room_set_lower'].values[offset:offset+nsamples] #building_model.T_room_set_lower
+   # Calculate negative deviations (below setpoint) - matching analyze_mpc_results.py approach
+   negative_deviation = np.maximum(0, T_lower - T_room)
+   
+   # Average and max comfort deviation in K (matching analyze_mpc_results.py)
+   avg_comfort_deviation = np.mean(negative_deviation)
+   max_comfort_deviation = np.max(negative_deviation)
 
    ## Evaluate results
    print("Qth_HP=%.2fkWh (av. per day=%.2fkWh), Qel_HP=%.2fkWh."         
@@ -40,8 +44,8 @@ def evaluate_mpc(hp_model,building_model,resultfile='results_mpc',resultdir=None
             np.nansum(Pel_HP/(3600/h))))
    print("Total cost (grid impact): %.2f" % (np.sum(Pel_HP/(3600/h)*grid)))
          
-   print("Consumer comfort deviation:av.=%.4fKh, max=%.4fK" 
-         % (arrsum/(3600/h)/(nsamples*3600/h),max(arr)))
+   print("Consumer comfort deviation:av.=%.4fK, max=%.4fK" 
+         % (avg_comfort_deviation, max_comfort_deviation))
 
    if mfig==0: return 
 

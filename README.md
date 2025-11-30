@@ -17,11 +17,12 @@ This Python project facilitates the quick generation of reduced order building m
 2. [Building Model](#building-models)
 3. [Disturbances](#disturbances)
 4. [Controller](#controller)
-5. [Gymnasium Interface (RL)](#gymnasium-interface-rl)
-6. [Training with Stable-Baselines3](#training-with-stable-baselines3)
-7. [Evaluation](#evaluation)
-8. [License](#license)
-9. [Acknowledgements](#acknowledgements)
+5. [Model Predictive Control (MPC)](#model-predictive-control-mpc)
+6. [Gymnasium Interface (RL)](#gymnasium-interface-rl)
+7. [Training with Stable-Baselines3](#training-with-stable-baselines3)
+8. [Evaluation](#evaluation)
+9. [License](#license)
+10. [Acknowledgements](#acknowledgements)
 
 ## Install Dependencies
 
@@ -96,11 +97,39 @@ Gymnasium-compatible RL interface is provided (see below).
 
 ![i4c-cntroller](https://github.com/lfrison/i4b/assets/104891971/87e45eff-9fea-4771-a8bc-ead693e322ee)
 
+## Model Predictive Control (MPC)
+
+An MPC controller implementation using [CasADi](https://web.casadi.org/) is provided. The MPC controller optimizes the heat pump supply temperature to minimize energy consumption while maintaining comfort constraints.
+
+### Running MPC Experiments
+
+To run an MPC simulation example, execute:
+
+```bash
+python -m examples.run_mpc
+```
+
+Key parameters to configure in the script:
+
+- **Building model**: Select from available buildings (e.g., `sfh_1984_1994_1_enev`, `sfh_1958_1968_0_soc`, `i4c`)
+- **Heat pump model**: Choose `Heatpump_AW` (air-water) or `Heatpump_Vitocal` (ground-source)
+- **Method**: Building thermal model (`2R2C`, `4R3C`, or `5R4C`)
+- **Timestep** (`h` or `delta_t`): Simulation timestep in seconds (e.g., `3600` for 1 hour, `900` for 15 minutes)
+- **MPC steps** (`mpc_steps`): Total number of MPC iterations to run
+- **Prediction horizon** (`nk`): Optimization horizon in timesteps (default: `24*int(3600/h)` for 1 day)
+- **Mass flow** (`mdot_hp`): Heat pump mass flow rate [kg/s] (default: `0.25`)
+- **Comfort setpoint**: `T_room_set_lower`[°C] Lowest room temperature to be defined as comfortable
+
+Results are saved to `results_mpc/` directory. The script automatically evaluates and prints summary statistics if `mpc_steps >= 24`, including:
+- Thermal and electrical energy consumption (kWh)
+- Total cost (grid impact)
+- Average and maximum comfort deviation (K)
+
 ## Gymnasium Interface (RL)
 
 The module `src/gym_interface/room_env.py` exposes the building thermal simulation as a Gymnasium environment `RoomHeatEnv`. A convenience factory and registration helpers are provided in `src/gym_interface/__init__.py`.
 
-- **Action space**: `Box([-1], [1])` (normalized). Mapped to supply flow temperature setpoint in °C within `[action_low, action_high]`.
+- **Action space**: `Box([-1], [1])` (normalized). Mapped to supply flow temperature setpoint in °C within `[action_low, action_high]`, where `action_low = 20` degrees and `action_high = 65` degrees.
 - **Observation**: Building state vector + current `T_amb`, `Qdot_gains` and optional future `T_amb` forecasts.
 - **API**: Returns `(obs, reward, terminated, truncated, info)` following Gymnasium.
 
@@ -111,12 +140,12 @@ from gym_interface import make_room_heat_env
 
 env = make_room_heat_env(
     building='sfh_2016_now_0_soc',
-    hp_model='HPbasic',
+    hp_model='Heatpump_AW',
     method='4R3C',
     mdot_HP=0.25,
     internal_gain_profile='data/profiles/InternalGains/ResidentialDetached.csv',
     weather_forecast_steps=[],  # e.g., [1,2,3] to append future T_amb steps
-    timestep=3600,
+    delta_t=900,  # timestep in seconds (900 = 15 minutes, 3600 = 1 hour)
     days=30,
     random_init=False,
     noise_level=0.0,
@@ -137,13 +166,13 @@ Direct instantiation (advanced users) is also supported by importing `RoomHeatEn
 We provide a minimal PPO training script:
 
 ```bash
-python examples/train_sb3_ppo.py \
+python -m examples.train_sb3_ppo \
   --building sfh_2016_now_0_soc \
-  --hp_model HPbasic \
+  --hp_model Heatpump_AW \
   --method 4R3C \
   --mdot_hp 0.25 \
   --internal_gain_profile data/profiles/InternalGains/ResidentialDetached.csv \
-  --timestep 3600 \
+  --delta_t 900 \
   --days 30 \
   --total_timesteps 200000 \
   --logdir runs/ppo_roomheat
@@ -155,21 +184,22 @@ Notes:
 
 ## Evaluation
 
+### RL Policy Evaluation
+
 Evaluate a saved PPO policy:
 
 ```bash
-python examples/eval_sb3_policy.py \
+python -m examples.eval_sb3_policy \
   --building sfh_2016_now_0_soc \
-  --hp_model HPbasic \
+  --hp_model Heatpump_AW \
   --method 4R3C \
   --mdot_hp 0.25 \
   --internal_gain_profile data/profiles/InternalGains/ResidentialDetached.csv \
-  --timestep 3600 \
+  --delta_t 900 \
   --days 30 \
-  --model_path runs/ppo_roomheat/ppo_roomheat.zip
+  --model_path runs/ppo_roomheat/ppo_roomheat.zip \
+  --num_episodes 5
 ```
-
-The script reports average return and total electricity use (kWh) across episodes.
 
 ## License
 

@@ -1,7 +1,6 @@
 """Training script for PPO agent on room heating control task."""
 import argparse
 import os
-import gymnasium as gym
 import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor
@@ -16,8 +15,8 @@ def make_env_fn(args):
         method=args.method,
         mdot_HP=args.mdot_hp,
         internal_gain_profile=args.internal_gain_profile,
-        weather_forecast_steps=[1, 2, 3] if args.forecast else [],
-        timestep=args.timestep,
+        weather_forecast_steps=list(range(1, args.forecast + 1)) if args.forecast > 0 else [],
+        delta_t=args.delta_t,
         days=args.days,
         random_init=args.random_init,
         goal_based=args.goal_based,
@@ -56,8 +55,10 @@ def main():
         help='Internal gains profile path'
     )
     parser.add_argument(
-        '--timestep', type=int, default=3600,
-        help='Environment timestep in seconds'
+        '--delta_t', type=int, default=900,
+        help='Environment timestep in seconds, if 3600, \
+            each timestep in the simulation is 1 hour, \
+            if 900, each timestep in the simulation is 15 minutes'
     )
     parser.add_argument(
         '--days', type=int, default=30,
@@ -68,8 +69,8 @@ def main():
         help='Use random initial conditions'
     )
     parser.add_argument(
-        '--forecast', action='store_true',
-        help='Include weather forecast in observations'
+        '--forecast', type=int, default=0,
+        help='Number of forecast steps to include in observations (0 = no forecast, >0 = number of steps ahead)'
     )
     parser.add_argument(
         '--obs_noise', type=float, default=0.0,
@@ -90,7 +91,7 @@ def main():
         help='Maximum goal temperature [C]'
     )
     parser.add_argument(
-        '--temp_deviation_weight', type=float, default=100.0,
+        '--temp_deviation_weight', type=float, default=5.0,
         help='Weight for temperature deviation in reward (0=disabled)'
     )
     
@@ -133,7 +134,7 @@ def main():
     
     # Create environment
     os.makedirs(args.logdir, exist_ok=True)
-    env = DummyVecEnv([make_env_fn(args)])
+    env = DummyVecEnv([lambda: make_env_fn(args)])
 
     # Create PPO model
     model = PPO(

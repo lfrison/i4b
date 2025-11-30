@@ -149,9 +149,9 @@ def make_env_id(
 ):
     """Compose a deterministic Gymnasium env-id string.
 
-    Example: i4b/RoomHeatEnv-sfh_2016_now_HPBasic_4R3C_nofc-v0
+    Example: RoomHeatEnv-sfh_2016_now_Heatpump_AW_4R3C_nofc-v0
     """
-    name = f"i4b/RoomHeatEnv-{building}_{hp_model}_{method}_{forecast}-v{version}"
+    name = f"RoomHeatEnv-{building}_{hp_model}_{method}_{forecast}-v{version}"
     return name
 
 
@@ -180,7 +180,7 @@ def make_room_heat_env(
     mdot_HP: float,
     internal_gain_profile: str,
     weather_forecast_steps=None,
-    timestep: int = 3600,
+    delta_t: int = 900,
     days: int = None,
     random_init: bool = False,
     goal_based: bool = False,
@@ -208,8 +208,8 @@ def make_room_heat_env(
         Path to internal gains profile.
     weather_forecast_steps : list, optional
         List of forecast steps.
-    timestep : int
-        Simulation timestep in seconds.
+    delta_t : int
+        Simulation timestep in seconds (default: 900).
     days : int, optional
         Episode length in days.
     random_init : bool
@@ -240,7 +240,7 @@ def make_room_heat_env(
         mdot_HP=mdot_HP,
         internal_gain_profile=internal_gain_profile,
         weather_forecast_steps=weather_forecast_steps,
-        timestep=timestep,
+        delta_t=delta_t,
         days=days,
         random_init=random_init,
         goal_based=goal_based,
