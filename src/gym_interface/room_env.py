@@ -360,6 +360,7 @@ class RoomHeatEnv(gym.Env):
         
         # Build info dictionary
         info = {
+            "cost": float(costs["dev_neg_max"]), # Reserved for SafeRL
             "Q_el_kWh": float(costs["E_el"]),
             "dev_sum": float(costs["dev_neg_sum"]),
             "dev_max": float(costs["dev_neg_max"]),

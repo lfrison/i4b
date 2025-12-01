@@ -20,9 +20,10 @@ This Python project facilitates the quick generation of reduced order building m
 5. [Model Predictive Control (MPC)](#model-predictive-control-mpc)
 6. [Gymnasium Interface (RL)](#gymnasium-interface-rl)
 7. [Training with Stable-Baselines3](#training-with-stable-baselines3)
-8. [Evaluation](#evaluation)
-9. [License](#license)
-10. [Acknowledgements](#acknowledgements)
+8. [Using Saferl with i4b (Safe RL)](#using-saferl-with-i4b-safe-rl)
+9. [Evaluation](#evaluation)
+10. [License](#license)
+11. [Acknowledgements](#acknowledgements)
 
 ## Install Dependencies
 
@@ -181,6 +182,92 @@ python -m examples.train_sb3_ppo \
 Notes:
 - Install RL extras first: `pip install -r requirements-rl.txt`.
 - Adjust `--forecast` to include simple ambient temperature forecasts.
+
+## Using Saferl with i4b (Safe RL)
+
+We provide a small integration layer in `examples/saferl_support/` that lets you train Safe RL agents from the
+Saferl library on the `RoomHeatEnv` simulator while keeping i4b self-contained.
+
+### 1. Clone Saferl and set up its environment
+
+```bash
+git clone git@github.com:nrgrp/saferl-lib.git
+cd saferl-lib
+conda create -n saferl python=3.10  # or use venv
+conda activate saferl
+```
+
+Following the instruction in saferl to install it.
+
+### 2. Clone i4b under Saferl `third_party`
+
+From inside the `saferl-lib` repo:
+
+```bash
+mkdir -p saferl/third_party
+cd saferl/third_party
+git clone https://github.com/lfrison/i4b.git i4b
+cd ../../..
+```
+
+### 3. Install additional i4b dependencies for Safe RL
+
+Install the core i4b requirements plus the Saferl-specific extras:
+
+```bash
+cd saferl-lib
+pip install -r saferl/third_party/i4b/examples/saferl_support/requirement_saferl.txt
+```
+
+### 4. Copy Saferl experiment configs
+
+The directory `saferl/third_party/i4b/examples/saferl_support/` contains example Hydra env configs for Saferl.
+Copy them into Saferl’s env config directory:
+
+```bash
+cp saferl/third_party/i4b/examples/saferl_support/RoomHeat*.yaml \
+   saferl/examples/configs/env/
+```
+
+This exposes `RoomHeat1-v0`, `RoomHeat1-v1`, `RoomHeat2-v0`, and `RoomHeat2-v1` as selectable `env=...` options in
+the Saferl CLI.
+
+### 5. Train a CSAC-LB agent on `RoomHeat1-v0`
+
+From the Saferl repo root:
+
+```bash
+cd saferl-lib
+export PYTHONPATH=$PWD:$PYTHONPATH
+
+python -m saferl.third_party.i4b.examples.train_saferl_csac_lb \
+  env=RoomHeat1-v0 \
+  algorithm=csac_lb \
+  num_env=5 \
+  seed=1 \
+  env.total_timesteps=960000 \
+  algorithm.model.cost_constraint=\"[10.0]\" \
+  algorithm.model.log_barrier_factor=10 \
+  algorithm.model.log_barrier_multipier=0.1 \
+  save_video=False \
+  eval_freq=96000 \
+  norm_obs=true norm_act=false norm_reward=false norm_cost=false
+```
+
+This launches distributed CSAC-LB training on `RoomHeat1-v0` using 5 parallel environments. Logs and models are
+stored under `saferl/exp/local/.../RoomHeat1-v0/csac_lb/...`.
+
+### 6. Evaluate the trained Saferl policy
+
+To evaluate a trained run (reporting the same metrics as the built-in PPO and MPC scripts):
+
+```bash
+python -m saferl.third_party.i4b.examples.eval_saferl_policy \
+  --exp_dir exp/local/<date>/Benchmark/RoomHeat1-v0/csac_lb/<run_id>/Seed1_Cost[10.0] \
+  --num_episodes 1 \
+  --device auto
+```
+
 
 ## Evaluation
 
