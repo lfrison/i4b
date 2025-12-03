@@ -201,13 +201,13 @@ Following the instruction in saferl to install it.
 
 ### 2. Clone i4b under Saferl `third_party`
 
-From inside the `saferl-lib` repo:
+From the `saferl-lib` repo direcotry:
 
 ```bash
 mkdir -p saferl/third_party
 cd saferl/third_party
 git clone https://github.com/lfrison/i4b.git i4b
-cd ../../..
+cd ../../
 ```
 
 ### 3. Install additional i4b dependencies for Safe RL
@@ -215,7 +215,6 @@ cd ../../..
 Install the core i4b requirements plus the Saferl-specific extras:
 
 ```bash
-cd saferl-lib
 pip install -r saferl/third_party/i4b/examples/saferl_support/requirement_saferl.txt
 ```
 
@@ -246,7 +245,7 @@ python -m saferl.third_party.i4b.examples.train_saferl_csac_lb \
   num_env=5 \
   seed=1 \
   env.total_timesteps=960000 \
-  algorithm.model.cost_constraint=\"[10.0]\" \
+  algorithm.model.cost_constraint="[10.0]" \
   algorithm.model.log_barrier_factor=10 \
   algorithm.model.log_barrier_multipier=0.1 \
   save_video=False \
@@ -256,6 +255,8 @@ python -m saferl.third_party.i4b.examples.train_saferl_csac_lb \
 
 This launches distributed CSAC-LB training on `RoomHeat1-v0` using 5 parallel environments. Logs and models are
 stored under `saferl/exp/local/.../RoomHeat1-v0/csac_lb/...`.
+
+To customize new building, please create a new yaml config under `saferl/examples/configs/env` referring to other room configs. Available buildings can be found under `saferl/third_party/i4b/src/gym_interface/__init__.py`. Make sure also change it both in train_env and eval_env under the yaml file and give a new corresponding env_name for saving.
 
 ### 6. Evaluate the trained Saferl policy
 
@@ -267,9 +268,6 @@ python -m saferl.third_party.i4b.examples.eval_saferl_policy \
   --num_episodes 1 \
   --device auto
 ```
-
-
-## Evaluation
 
 ### RL Policy Evaluation
 
