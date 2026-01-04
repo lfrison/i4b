@@ -1,5 +1,4 @@
 #%% i4c building - Two family house, kfw 40+
-#from Utilities import C_AIR_SPEC, RHO_AIR
 from src.models.model_buildings import C_AIR_SPEC, RHO_AIR,C_INT_SPEC
 
 # Geometry and material properties

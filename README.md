@@ -17,11 +17,13 @@ This Python project facilitates the quick generation of reduced order building m
 2. [Building Model](#building-models)
 3. [Disturbances](#disturbances)
 4. [Controller](#controller)
-5. [Gymnasium Interface (RL)](#gymnasium-interface-rl)
-6. [Training with Stable-Baselines3](#training-with-stable-baselines3)
-7. [Evaluation](#evaluation)
-8. [License](#license)
-9. [Acknowledgements](#acknowledgements)
+5. [Model Predictive Control (MPC)](#model-predictive-control-mpc)
+6. [Gymnasium Interface (RL)](#gymnasium-interface-rl)
+7. [Training with Stable-Baselines3](#training-with-stable-baselines3)
+8. [Using Saferl with i4b (Safe RL)](#using-saferl-with-i4b-safe-rl)
+9. [Evaluation](#evaluation)
+10. [License](#license)
+11. [Acknowledgements](#acknowledgements)
 
 ## Install Dependencies
 
@@ -96,11 +98,39 @@ Gymnasium-compatible RL interface is provided (see below).
 
 ![i4c-cntroller](https://github.com/lfrison/i4b/assets/104891971/87e45eff-9fea-4771-a8bc-ead693e322ee)
 
+## Model Predictive Control (MPC)
+
+An MPC controller implementation using [CasADi](https://web.casadi.org/) is provided. The MPC controller optimizes the heat pump supply temperature to minimize energy consumption while maintaining comfort constraints.
+
+### Running MPC Experiments
+
+To run an MPC simulation example, execute:
+
+```bash
+python -m examples.run_mpc
+```
+
+Key parameters to configure in the script:
+
+- **Building model**: Select from available buildings (e.g., `sfh_1984_1994_1_enev`, `sfh_1958_1968_0_soc`, `i4c`)
+- **Heat pump model**: Choose `Heatpump_AW` (air-water) or `Heatpump_Vitocal` (ground-source)
+- **Method**: Building thermal model (`2R2C`, `4R3C`, or `5R4C`)
+- **Timestep** (`h` or `delta_t`): Simulation timestep in seconds (e.g., `3600` for 1 hour, `900` for 15 minutes)
+- **MPC steps** (`mpc_steps`): Total number of MPC iterations to run
+- **Prediction horizon** (`nk`): Optimization horizon in timesteps (default: `24*int(3600/h)` for 1 day)
+- **Mass flow** (`mdot_hp`): Heat pump mass flow rate [kg/s] (default: `0.25`)
+- **Comfort setpoint**: `T_room_set_lower`[°C] Lowest room temperature to be defined as comfortable
+
+Results are saved to `results_mpc/` directory. The script automatically evaluates and prints summary statistics if `mpc_steps >= 24`, including:
+- Thermal and electrical energy consumption (kWh)
+- Total cost (grid impact)
+- Average and maximum comfort deviation (K)
+
 ## Gymnasium Interface (RL)
 
 The module `src/gym_interface/room_env.py` exposes the building thermal simulation as a Gymnasium environment `RoomHeatEnv`. A convenience factory and registration helpers are provided in `src/gym_interface/__init__.py`.
 
-- **Action space**: `Box([-1], [1])` (normalized). Mapped to supply flow temperature setpoint in °C within `[action_low, action_high]`.
+- **Action space**: `Box([-1], [1])` (normalized). Mapped to supply flow temperature setpoint in °C within `[action_low, action_high]`, where `action_low = 20` degrees and `action_high = 65` degrees.
 - **Observation**: Building state vector + current `T_amb`, `Qdot_gains` and optional future `T_amb` forecasts.
 - **API**: Returns `(obs, reward, terminated, truncated, info)` following Gymnasium.
 
@@ -111,12 +141,12 @@ from gym_interface import make_room_heat_env
 
 env = make_room_heat_env(
     building='sfh_2016_now_0_soc',
-    hp_model='HPbasic',
+    hp_model='Heatpump_AW',
     method='4R3C',
     mdot_HP=0.25,
     internal_gain_profile='data/profiles/InternalGains/ResidentialDetached.csv',
     weather_forecast_steps=[],  # e.g., [1,2,3] to append future T_amb steps
-    timestep=3600,
+    delta_t=900,  # timestep in seconds (900 = 15 minutes, 3600 = 1 hour)
     days=30,
     random_init=False,
     noise_level=0.0,
@@ -137,13 +167,13 @@ Direct instantiation (advanced users) is also supported by importing `RoomHeatEn
 We provide a minimal PPO training script:
 
 ```bash
-python examples/train_sb3_ppo.py \
+python -m examples.train_sb3_ppo \
   --building sfh_2016_now_0_soc \
-  --hp_model HPbasic \
+  --hp_model Heatpump_AW \
   --method 4R3C \
   --mdot_hp 0.25 \
   --internal_gain_profile data/profiles/InternalGains/ResidentialDetached.csv \
-  --timestep 3600 \
+  --delta_t 900 \
   --days 30 \
   --total_timesteps 200000 \
   --logdir runs/ppo_roomheat
@@ -153,23 +183,108 @@ Notes:
 - Install RL extras first: `pip install -r requirements-rl.txt`.
 - Adjust `--forecast` to include simple ambient temperature forecasts.
 
-## Evaluation
+## Using Saferl with i4b (Safe RL)
+
+We provide a small integration layer in `examples/saferl_support/` that lets you train Safe RL agents from the
+Saferl library on the `RoomHeatEnv` simulator while keeping i4b self-contained.
+
+### 1. Clone Saferl and set up its environment
+
+```bash
+git clone git@github.com:nrgrp/saferl-lib.git
+cd saferl-lib
+conda create -n saferl python=3.10  # or use venv
+conda activate saferl
+```
+
+Following the instruction in saferl to install it.
+
+### 2. Clone i4b under Saferl `third_party`
+
+From the `saferl-lib` repo direcotry:
+
+```bash
+mkdir -p saferl/third_party
+cd saferl/third_party
+git clone https://github.com/lfrison/i4b.git i4b
+cd ../../
+```
+
+### 3. Install additional i4b dependencies for Safe RL
+
+Install the core i4b requirements plus the Saferl-specific extras:
+
+```bash
+pip install -r saferl/third_party/i4b/examples/saferl_support/requirement_saferl.txt
+```
+
+### 4. Copy Saferl experiment configs
+
+The directory `saferl/third_party/i4b/examples/saferl_support/` contains example Hydra env configs for Saferl.
+Copy them into Saferl’s env config directory:
+
+```bash
+cp saferl/third_party/i4b/examples/saferl_support/RoomHeat*.yaml \
+   saferl/examples/configs/env/
+```
+
+This exposes `RoomHeat1-v0`, `RoomHeat1-v1`, `RoomHeat2-v0`, and `RoomHeat2-v1` as selectable `env=...` options in
+the Saferl CLI.
+
+### 5. Train a CSAC-LB agent on `RoomHeat1-v0`
+
+From the Saferl repo root:
+
+```bash
+cd saferl-lib
+export PYTHONPATH=$PWD:$PYTHONPATH
+
+python -m saferl.third_party.i4b.examples.train_saferl_csac_lb \
+  env=RoomHeat1-v0 \
+  algorithm=csac_lb \
+  num_env=5 \
+  seed=1 \
+  env.total_timesteps=960000 \
+  algorithm.model.cost_constraint="[10.0]" \
+  algorithm.model.log_barrier_factor=10 \
+  algorithm.model.log_barrier_multipier=0.1 \
+  save_video=False \
+  eval_freq=96000 \
+  norm_obs=true norm_act=false norm_reward=false norm_cost=false
+```
+
+This launches distributed CSAC-LB training on `RoomHeat1-v0` using 5 parallel environments. Logs and models are
+stored under `saferl/exp/local/.../RoomHeat1-v0/csac_lb/...`.
+
+To customize new building, please create a new yaml config under `saferl/examples/configs/env` referring to other room configs. Available buildings can be found under `saferl/third_party/i4b/src/gym_interface/__init__.py`. Make sure also change it both in train_env and eval_env under the yaml file and give a new corresponding env_name for saving.
+
+### 6. Evaluate the trained Saferl policy
+
+To evaluate a trained run (reporting the same metrics as the built-in PPO and MPC scripts):
+
+```bash
+python -m saferl.third_party.i4b.examples.eval_saferl_policy \
+  --exp_dir exp/local/<date>/Benchmark/RoomHeat1-v0/csac_lb/<run_id>/Seed1_Cost[10.0] \
+  --num_episodes 1 \
+  --device auto
+```
+
+### RL Policy Evaluation
 
 Evaluate a saved PPO policy:
 
 ```bash
-python examples/eval_sb3_policy.py \
+python -m examples.eval_sb3_policy \
   --building sfh_2016_now_0_soc \
-  --hp_model HPbasic \
+  --hp_model Heatpump_AW \
   --method 4R3C \
   --mdot_hp 0.25 \
   --internal_gain_profile data/profiles/InternalGains/ResidentialDetached.csv \
-  --timestep 3600 \
+  --delta_t 900 \
   --days 30 \
-  --model_path runs/ppo_roomheat/ppo_roomheat.zip
+  --model_path runs/ppo_roomheat/ppo_roomheat.zip \
+  --num_episodes 5
 ```
-
-The script reports average return and total electricity use (kWh) across episodes.
 
 ## License
 

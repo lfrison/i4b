@@ -1,38 +1,51 @@
 """Evaluation script for trained PPO agent on room heating control task."""
 import argparse
-import os
-import sys
-from pathlib import Path
-
 import numpy as np
 import torch
 from stable_baselines3 import PPO
-
-# Ensure local i4b root is on the path when running from repo root
-I4B_ROOT = Path(__file__).resolve().parents[1]
-if str(I4B_ROOT) not in sys.path:
-    sys.path.insert(0, str(I4B_ROOT))
-    
 from src.gym_interface import make_room_heat_env
-
 
 def evaluate(model, env, num_episodes=5):
     returns = []
     energy = []
+    dev_max_neg = []  # Maximum negative temperature deviation per episode [K]
+    dev_mean_neg = []  # Mean negative temperature deviation per episode [K]
+    
+    # Get setpoint temperature from environment (matching analyze_mpc_results.py)
+    # Use unwrapped to access the underlying RoomHeatEnv instance
+    setpoint_temp = env.unwrapped.bldg_model.T_room_set_lower
+    
     for _ in range(num_episodes):
         obs, _ = env.reset()
         done = False
         truncated = False
         ep_ret = 0.0
         ep_energy = 0.0
+        ep_temps = []  # Track T_room values to calculate deviations
+        
         while not (done or truncated):
             action, _ = model.predict(obs, deterministic=True)
             obs, reward, done, truncated, info = env.step(action)
             ep_ret += reward
             ep_energy += info.get('Q_el_kWh', 0.0)
+            # Track T_room for deviation calculation (matching analyze_mpc_results.py)
+            ep_temps.append(info.get('T_room', 0.0))
+        
+        # Calculate deviations matching analyze_mpc_results.py approach
+        ep_temps = np.array(ep_temps)
+        # Negative deviations (below setpoint) - only count when temperature is below setpoint
+        negative_deviation = np.maximum(0, setpoint_temp - ep_temps)
+        
+        # Mean and max negative deviation in K (matching analyze_mpc_results.py)
+        ep_dev_mean = np.mean(negative_deviation) if len(negative_deviation) > 0 else 0.0
+        ep_dev_max = np.max(negative_deviation) if len(negative_deviation) > 0 else 0.0
+        
         returns.append(ep_ret)
         energy.append(ep_energy)
-    return np.array(returns), np.array(energy)
+        dev_max_neg.append(ep_dev_max)
+        dev_mean_neg.append(ep_dev_mean)
+    
+    return np.array(returns), np.array(energy), np.array(dev_max_neg), np.array(dev_mean_neg)
 
 
 def main():
@@ -45,7 +58,7 @@ def main():
         help='Building model name'
     )
     parser.add_argument(
-        '--hp_model', type=str, default='HPbasic',
+        '--hp_model', type=str, default='Heatpump_AW',
         help='Heat pump model type'
     )
     parser.add_argument(
@@ -62,7 +75,7 @@ def main():
         help='Internal gains profile path'
     )
     parser.add_argument(
-        '--timestep', type=int, default=3600,
+        '--delta_t', type=int, default=3600,
         help='Environment timestep in seconds'
     )
     parser.add_argument(
@@ -104,7 +117,7 @@ def main():
         mdot_HP=args.mdot_hp,
         internal_gain_profile=args.internal_gain_profile,
         weather_forecast_steps=[],
-        timestep=args.timestep,
+        delta_t=args.delta_t,
         days=args.days,
         random_init=False,
         noise_level=0.0,
@@ -116,15 +129,17 @@ def main():
     
     # Evaluate
     print(f"Evaluating for {args.num_episodes} episodes...\n")
-    rets, energy = evaluate(model, env, num_episodes=args.num_episodes)
+    rets, energy, dev_max_neg, dev_mean_neg = evaluate(model, env, num_episodes=args.num_episodes)
     
-    # Print results
+    # Print results (matching analyze_mpc_results.py format)
     print("\n" + "="*50)
     print("EVALUATION RESULTS")
     print("="*50)
-    print(f"Average return:      {rets.mean():8.3f} ± {rets.std():.3f}")
-    print(f"Average energy:      {energy.mean():8.3f} ± {energy.std():.3f} kWh")
-    print(f"Episodes evaluated:  {args.num_episodes}")
+    print(f"Average return:              {rets.mean():8.3f} ± {rets.std():.3f}")
+    print(f"Average energy:              {energy.mean():8.3f} ± {energy.std():.3f} kWh")
+    print(f"Mean neg. temp. deviation:  {dev_mean_neg.mean():8.4f} ± {dev_mean_neg.std():.4f} K")
+    print(f"Max neg. temp. deviation:    {dev_max_neg.mean():8.4f} ± {dev_max_neg.std():.4f} K")
+    print(f"Episodes evaluated:          {args.num_episodes}")
     print("="*50)
 
 

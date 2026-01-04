@@ -4,7 +4,7 @@ Created on Sun Oct 10 17:58:34 2021
 
 @author: lfrison
 """
-c_water=4181      # heat capacity of water
+from src.constants import C_WATER_SPEC
 import casadi as cas
 
 class optimization_problem:
@@ -57,7 +57,7 @@ class optimization_problem:
    
    def constraint_slack(self,x,u,p,s):
       T_room = x[0]
-      T_set_low = p[-2]#self.building_model.T_room_set_lower
+      T_set_low = p[-2]
       return T_room - T_set_low + s[0] 
 
    def constraint_slack_upper(self,x,u,p,s):
@@ -68,11 +68,11 @@ class optimization_problem:
    # bounds on Qhp are temperature dependent: Qhp<=32.875-0.225Tsink , Qhp>=8.75-0.05Tsink
    def constraint_HP_low(self,x,u,p,s):
       T_RL = x[-1]
-      return c_water*self.hp_model.mdot_HP/1000*(u[0] - T_RL) 
+      return C_WATER_SPEC*self.hp_model.mdot_HP/1000*(u[0] - T_RL) 
    
    def constraint_HP_up(self,x,u,p,s):
       T_RL = x[-1]
-      return -(c_water*self.hp_model.mdot_HP/1000*(u[0] - T_RL)  - 26)# (20 - 0.225*u[0])) # check if HP specific
+      return -(C_WATER_SPEC*self.hp_model.mdot_HP/1000*(u[0] - T_RL)  - 26)# (20 - 0.225*u[0])) # check if HP specific
    
 
 

@@ -2,7 +2,6 @@
 # Functions to generate disturbance profiles.
 
 from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import pvlib
@@ -81,10 +80,6 @@ def generate_disturbances_all(building_model, year=2015, timestep=900, offset_da
       data_grid_[:data_grid[::2].shape[0]] = data_grid[::2]
       data_grid_[data_grid[::2].shape[0]:] = data_grid[1::2]
 
-      # check for NaNs: np.argwhere(np.isnan(data_grid))
-      #bins = np.linspace(np.nanmin(data_grid),np.nanmax(data_grid),10)
-      #grid_bins=(np.digitize(data_grid,bins))#*.1
-      #data_grid=grid_bins
    p_hourly['grid'] = data_grid_[:Qdot_sol.shape[0]]
    
 
@@ -509,9 +504,7 @@ def get_solar_gains(weather, bldg_params, albedo = 0.2):
     Notes
     -----
 
-    !ToDo:
 
-    - return individual aswell as sum of all solar heatflows.
     
     '''
     

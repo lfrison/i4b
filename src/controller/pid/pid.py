@@ -41,9 +41,6 @@ class PID:
         float
             control variable (u, Stellgröße)
 
-        Notes
-        -----
-        !ToDo add anti wind up
         '''
 
         error = set_point - actual_value      # error [degC] | Reglerabweichung (e = w - x)
