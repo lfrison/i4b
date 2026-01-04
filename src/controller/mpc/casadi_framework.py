@@ -36,7 +36,7 @@ class MPC_solver:
       self.vars_ub = np.concatenate((np.reshape(xk_next,(nx,)),self.vars_ub[nx:]))
 
 
-   def solve_NLP(self,P_opt,PRINT=False):
+   def solve_NLP(self,P_opt,PRINT=False,return_res=False):
       dim= self.dim
 
       # Update & solve NLP     
@@ -66,6 +66,8 @@ class MPC_solver:
         # Update NLP for next iteration
       self.vars_init = np.concatenate((res["x"][((d+1)*(nx+ns)+nu):],res["x"][-((d+1)*(nx+ns)+nu):]))
       
+      if return_res:
+         return uk, xk_next, res
       return uk, xk_next
       
    

@@ -11,7 +11,7 @@ import json
 import random
 
 
-def generate_disturbances_all(building_model, year=2015, timestep=900, offset_days=0, GRID_ON=True):
+def generate_disturbances_all(building_model, year=2015, timestep=900, offset_days=0, GRID_ON=True, repo_filepath=''):
    '''
    Compose all disturbances:
    - T_amb (ambient temperature)
@@ -30,6 +30,9 @@ def generate_disturbances_all(building_model, year=2015, timestep=900, offset_da
       
    GRID_ON: bool
       If True uses a grid-supportive signal; otherwise uses a constant unit signal.
+   repo_filepath: str
+      Base path of the repository; set if the current working directory
+      differs from the repo root so that weather/profile CSVs are found.
       
    Returns
    -------
@@ -40,12 +43,13 @@ def generate_disturbances_all(building_model, year=2015, timestep=900, offset_da
    weather_df = load_weather(latitude = building_model.params['position']['lat'], 
                                  longitude = building_model.params['position']['long'],
                                  altitude  = building_model.params['position']['altitude'],
-                                 year=year)[0:8760]
+                                 year=year,
+                                 repo_filepath=repo_filepath)[0:8760]
 
    # 2. Generate absolute heat gain profiles based on datetime, building usage and floor area.
    # Profiles: Profil_HIL, ResidentialDetached
    int_gains_df = get_int_gains(time = weather_df.index,
-                                   profile_path = 'data/profiles/InternalGains/ResidentialDetached.csv',
+                                   profile_path = Path(repo_filepath, 'data', 'profiles', 'InternalGains', 'ResidentialDetached.csv'),
                                    bldg_area = building_model.params['area_floor'] )
 
    # 3. Generate profiles of solar heat gains, based on datetime and irradiance data in the weather df,
@@ -72,7 +76,7 @@ def generate_disturbances_all(building_model, year=2015, timestep=900, offset_da
    data_grid,data_grid_ = np.ones(Qdot_sol.shape[0]),np.ones(Qdot_sol.shape[0])
    # read grid data
    if GRID_ON: 
-      data_grid = pd.read_csv(Path('data/grid/grid_signals.csv'),sep=',',header='infer')['EEX2015'].values*0.001*100 # Cent/kWh
+      data_grid = pd.read_csv(Path(repo_filepath, 'data', 'grid', 'grid_signals.csv'),sep=',',header='infer')['EEX2015'].values*0.001*100 # Cent/kWh
       data_grid_ = data_grid.copy()
       data_grid_[:data_grid[::2].shape[0]] = data_grid[::2]
       data_grid_[data_grid[::2].shape[0]:] = data_grid[1::2]
@@ -581,10 +585,11 @@ def get_int_gains(time, profile_path, bldg_area = None):
         - Qdot_app         : Absolute internal gains through appliances [W]
         - Qdot_tot         : Total absolute internal gains [W]
     '''
-    if isinstance(profile_path, str):
+    # Accept str/Path or an already loaded DataFrame
+    if isinstance(profile_path, (str, Path)):
         profile = pd.read_csv(profile_path,
-                            delimiter = ";",
-                            index_col = "hour")
+                              delimiter = ";",
+                              index_col = "hour")
     else:
         profile = profile_path
         
