@@ -1,0 +1,35 @@
+env:
+  type: vec
+  num_envs: 1024
+  hp_model: Heatpump_AW
+  building: sfh_2016_now_0_soc
+  method: 4R3C
+  mdot_HP: 0.25
+  internal_gain_profile: data/profiles/InternalGains/ResidentialDetached.csv
+  weather_forecast_steps: []
+  delta_t: 900
+  days: 2
+  backend: jax
+  device: gpu
+  return_numpy: false
+  steps_per_call: 10
+  batch_mode: stacked
+  saveat_mode: t1
+  norm_mode: max
+  fast_cost: true
+  integration_steps: 10
+  step_mode: fixed
+  integrator: auto
+  return_trajectories: false
+  compute_metrics: false
+  sync_time: true
+  performance_mode: true
+
+domain_randomization:
+  seed: 7
+  events:
+    - when: on_reset
+      target: mdot_hp
+      distribution: uniform
+      low: 0.24
+      high: 0.28

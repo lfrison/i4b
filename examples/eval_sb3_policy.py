@@ -2,8 +2,19 @@
 import argparse
 import numpy as np
 import torch
+import sys
+from pathlib import Path
+
 from stable_baselines3 import PPO
+
+# Allow running as `python examples/eval_sb3_policy.py` from any CWD.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_repo_root_str = str(_REPO_ROOT)
+if _repo_root_str not in sys.path:
+    sys.path.insert(0, _repo_root_str)
+
 from src.gym_interface import make_room_heat_env
+from src.gym_interface.config import load_yaml_config, make_room_heat_env_from_config
 
 def evaluate(model, env, num_episodes=5):
     returns = []
@@ -54,6 +65,10 @@ def main():
         description="Evaluate trained PPO agent for room heating control"
     )
     parser.add_argument(
+        '--config', type=str, default=None,
+        help='Path to YAML config. If set, env/evaluation settings are read from YAML.'
+    )
+    parser.add_argument(
         '--building', type=str, default='sfh_2016_now_0_soc',
         help='Building model name'
     )
@@ -83,7 +98,7 @@ def main():
         help='Number of simulation days per episode'
     )
     parser.add_argument(
-        '--model_path', type=str, required=True,
+        '--model_path', type=str, default=None,
         help='Path to trained model'
     )
     parser.add_argument(
@@ -97,39 +112,54 @@ def main():
     )
     
     args = parser.parse_args()
+    cfg = load_yaml_config(args.config) if args.config else None
+    eval_cfg = cfg.get("evaluation", {}) if cfg else {}
+
+    model_path = args.model_path or eval_cfg.get("model_path")
+    if not model_path:
+        raise ValueError("Model path is required. Set --model_path or evaluation.model_path in YAML.")
+    num_episodes = int(eval_cfg.get("num_episodes", args.num_episodes))
+    requested_device = str(eval_cfg.get("device", args.device))
 
     # Determine device
-    if args.device == 'auto':
+    if requested_device == 'auto':
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f"Auto-detected device: {device.upper()}")
     else:
-        device = args.device
+        device = requested_device
         print(f"Using {device.upper()} for evaluation")
     
     if device == 'cuda':
         print(f"GPU: {torch.cuda.get_device_name(0)}")
 
     # Create environment
-    env = make_room_heat_env(
-        building=args.building,
-        hp_model=args.hp_model,
-        method=args.method,
-        mdot_HP=args.mdot_hp,
-        internal_gain_profile=args.internal_gain_profile,
-        weather_forecast_steps=[],
-        delta_t=args.delta_t,
-        days=args.days,
-        random_init=False,
-        noise_level=0.0,
-    )
+    if cfg is not None:
+        env = make_room_heat_env_from_config(
+            cfg,
+            env_key="env",
+            randomization_key="domain_randomization",
+        )
+    else:
+        env = make_room_heat_env(
+            building=args.building,
+            hp_model=args.hp_model,
+            method=args.method,
+            mdot_HP=args.mdot_hp,
+            internal_gain_profile=args.internal_gain_profile,
+            weather_forecast_steps=[],
+            delta_t=args.delta_t,
+            days=args.days,
+            random_init=False,
+            noise_level=0.0,
+        )
 
     # Load model
-    print(f"\nLoading model from {args.model_path}...")
-    model = PPO.load(args.model_path, device=device)
+    print(f"\nLoading model from {model_path}...")
+    model = PPO.load(model_path, device=device)
     
     # Evaluate
-    print(f"Evaluating for {args.num_episodes} episodes...\n")
-    rets, energy, dev_max_neg, dev_mean_neg = evaluate(model, env, num_episodes=args.num_episodes)
+    print(f"Evaluating for {num_episodes} episodes...\n")
+    rets, energy, dev_max_neg, dev_mean_neg = evaluate(model, env, num_episodes=num_episodes)
     
     # Print results (matching analyze_mpc_results.py format)
     print("\n" + "="*50)
@@ -139,12 +169,10 @@ def main():
     print(f"Average energy:              {energy.mean():8.3f} ± {energy.std():.3f} kWh")
     print(f"Mean neg. temp. deviation:  {dev_mean_neg.mean():8.4f} ± {dev_mean_neg.std():.4f} K")
     print(f"Max neg. temp. deviation:    {dev_max_neg.mean():8.4f} ± {dev_max_neg.std():.4f} K")
-    print(f"Episodes evaluated:          {args.num_episodes}")
+    print(f"Episodes evaluated:          {num_episodes}")
     print("="*50)
 
 
 if __name__ == '__main__':
     main()
-
-
 

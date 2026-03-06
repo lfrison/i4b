@@ -5,3 +5,8 @@ pandas==2.3.3
 gymnasium==1.2.1
 scipy==1.15.0
 matplotlib==3.10.7
+jax==0.6.2
+jaxlib==0.6.2
+diffrax==0.7.0
+equinox==0.10.10
+PyYAML==6.0.2

@@ -115,12 +115,6 @@ def plot(fig, ax, plt, tf, savename=None, folder="figures"):
          os.mkdir(folder)
       fig.savefig('%s/%s.png' % (folder,savename),bbox_inches='tight')   
      
-
-
-
-
-    
-    
 def get_all_buildings_as_dict():
     ''' Get a dictionary of all TABULA buildings in the data/buildings directory '''
 

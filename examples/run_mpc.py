@@ -21,9 +21,11 @@ import pandas as pd
 
 warnings.filterwarnings("ignore")
 
-# Ensure the root of your package is in the PYTHONPATH
-root_path = str(Path(__file__).resolve().parent)
-sys.path.insert(0, root_path)
+# Allow running as `python examples/run_mpc.py` from any CWD.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_repo_root_str = str(_REPO_ROOT)
+if _repo_root_str not in sys.path:
+    sys.path.insert(0, _repo_root_str)
 
 import src.disturbances as disturbances
 import src.models.model_buildings as model_buildings

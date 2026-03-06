@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional, Callable
 import pandas as pd
 import numpy as np
 import gymnasium as gym
@@ -8,7 +8,11 @@ from src.simulator import Model_simulator
 from src.models.model_buildings import Building
 from src.gym_interface import BUILDING_NAMES2CLASS
 from src.gym_interface.constant import OBSERVATION_SPACE_LIMIT
-from src.disturbances import load_weather, get_solar_gains, get_int_gains
+from src.disturbances import load_weather, load_weather_for_city, get_solar_gains, get_int_gains
+from src.core.params import compute_derived_params
+from src.core.sim import JaxSimulator, LINEAR_METHODS
+from src.core.hvac import hp_params
+from src.randomization import EventManager, EventSpec
 
 
 class RoomHeatEnv(gym.Env):   
@@ -19,10 +23,10 @@ class RoomHeatEnv(gym.Env):
     in the range [-1, 1], mapped to a physical range [20, 65] degrees Celsius.
 
     Observations contain:
-    - Building states (T_room, T_wall, T_hp_ret, T_hp_sup)
-    - Current disturbances (T_amb, Qdot_gains)
-    - Optional weather forecasts
-    - Optional goal temperature (when goal_based=True)
+    - Building thermal states (varies by method, e.g. T_room, T_wall, T_hp_ret for 4R3C)
+    - Current disturbances: T_amb, Qdot_gains
+    - Optional weather forecast: T_amb at future timesteps (weather_forecast_steps)
+    - Optional goal temperature appended when goal_based=True
 
     Episode termination uses standard Gymnasium semantics:
     - terminated: always False (no terminal states by default)
@@ -42,6 +46,21 @@ class RoomHeatEnv(gym.Env):
         delta_t: int = 900,
         days: int = None,
         random_init: bool = False,
+        backend: str = "jax",
+        device: str = "cpu",
+        return_numpy: bool = False,
+        termination_fn: Optional[Callable] = None,
+        randomization_events: Optional[List[EventSpec]] = None,
+        randomization_seed: Optional[int] = None,
+        allow_weather_download: bool = False,
+        city: Optional[str] = None,
+        batch_mode: str = "vmap",
+        saveat_mode: str = "ts",
+        norm_mode: str = "rms",
+        fast_cost: bool = False,
+        integration_steps: int = 10,
+        step_mode: str = "adaptive",
+        integrator: str = "diffrax",
         # Goal-based learning parameters
         goal_based: bool = False,
         goal_temp_range: Tuple[float, float] = (19.0, 28.0),
@@ -86,24 +105,71 @@ class RoomHeatEnv(gym.Env):
             Weight for temperature deviation penalty in reward function (default 0).
         noise_level : float
             Standard deviation of Gaussian noise added to observations.
+        batch_mode : str
+            JAX batch mode ("vmap" or "stacked") for Diffrax integration.
+        saveat_mode : str
+            Diffrax save mode ("ts" for intermediate states or "t1" for final only).
+        norm_mode : str
+            Norm used by the adaptive stepsize controller ("rms" or "max").
+        fast_cost : bool
+            If True and saveat_mode is "t1", compute costs from final state only.
+        integration_steps : int
+            Number of fixed integration steps per env step.
+        step_mode : str
+            Integration step mode ("adaptive" or "fixed").
+        integrator : str
+            Integration backend ("diffrax" or "jax_rk4").
         grid_profile : str
-            Optional grid price/signal profile name (unused, for future).
+            Deprecated. Has no effect; kept for backward compatibility.
         cost_dim : int
-            If 1, only log dev_neg_max; if 2, also log dev_neg_sum and a bool flag.
+            Deprecated. Has no effect; kept for backward compatibility.
         action_deviation_factor : float
-            Legacy parameter, kept for compatibility.
+            Deprecated. Has no effect; kept for backward compatibility.
         dev_sum_weight : float
-            Legacy parameter, kept for compatibility.
+            Deprecated. Has no effect; kept for backward compatibility.
         dev_max_weight : float
-            Legacy parameter, kept for compatibility.
+            Deprecated. Has no effect; kept for backward compatibility.
         """
+        import warnings
+        _legacy = {
+            "grid_profile": grid_profile,
+            "cost_dim": cost_dim if cost_dim != 1 else None,
+            "action_deviation_factor": action_deviation_factor if action_deviation_factor != 10 else None,
+            "dev_sum_weight": dev_sum_weight if dev_sum_weight != 100 else None,
+            "dev_max_weight": dev_max_weight if dev_max_weight != 100 else None,
+        }
+        _active_legacy = [k for k, v in _legacy.items() if v is not None]
+        if _active_legacy:
+            warnings.warn(
+                f"RoomHeatEnv received deprecated parameters {_active_legacy} which have no effect. "
+                "They will be removed in a future version.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         super(RoomHeatEnv, self).__init__()
 
         # Core simulation parameters
         self.delta_t = delta_t  # Store internally as timestep for compatibility
+        self.days = days
         self.method = method
         self.cost_dim = cost_dim
         self.noise_level = noise_level
+        self.backend = backend
+        self.device = device
+        self.return_numpy = return_numpy
+        self.termination_fn = termination_fn
+        self.event_manager = EventManager(randomization_events, seed=randomization_seed) if randomization_events else None
+        self.allow_weather_download = allow_weather_download
+        self.city = city
+        self.batch_mode = batch_mode
+        self.saveat_mode = saveat_mode
+        self.norm_mode = norm_mode
+        self.fast_cost = fast_cost
+        self.integration_steps = integration_steps
+        self.step_mode = step_mode
+        self.integrator = integrator
+        self.internal_gain_profile = internal_gain_profile
+        self._resolve_runtime_options()
         
         # Goal-based learning
         self.goal_based = goal_based
@@ -119,9 +185,14 @@ class RoomHeatEnv(gym.Env):
         
         print(f"Building {building} is selected")
         self.building = BUILDING_NAMES2CLASS[building]
+        self.env_params = dict(self.building)
+        self.env_params['mdot_hp'] = mdot_HP
+        if self.event_manager:
+            self.env_params = self.event_manager.apply("on_start", [self.env_params])[0]
+            self.building = dict(self.env_params)
         self.bldg_model = Building(
             params=self.building,
-            mdot_hp=mdot_HP,
+            mdot_hp=self.env_params.get('mdot_hp', mdot_HP),
             method=self.method
         )
         
@@ -130,11 +201,40 @@ class RoomHeatEnv(gym.Env):
         self.hp_model_name = hp_model
         
         # Initialize simulator
-        self.simulator = Model_simulator(
-            hp_model=self.hp_model,
-            bldg_model=self.bldg_model,
-            timestep=self.delta_t,
-        )
+        if self.backend == "jax":
+            try:
+                import jax
+                import jax.numpy as jnp
+            except Exception as e:
+                raise ImportError("JAX backend requested but jax is not installed.") from e
+            self.jax = jax
+            self.jnp = jnp
+            if self.device == "gpu":
+                devices = jax.devices("gpu")
+                if not devices:
+                    raise RuntimeError("GPU device requested but no GPU devices available.")
+                self.jax_device = devices[0]
+            else:
+                self.jax_device = jax.devices("cpu")[0]
+            self.simulator = JaxSimulator(
+                method=self.method,
+                timestep=self.delta_t,
+                batch_mode=self.batch_mode,
+                saveat_mode=self.saveat_mode,
+                norm_mode=self.norm_mode,
+                integration_steps=self.integration_steps,
+                step_mode=self.step_mode,
+                integrator=self.integrator,
+            )
+            self.hp_params = hp_params(self.hp_model_name, mdot_HP)
+        elif self.backend == "legacy":
+            self.simulator = Model_simulator(
+                hp_model=self.hp_model,
+                bldg_model=self.bldg_model,
+                timestep=self.delta_t,
+            )
+        else:
+            raise ValueError(f"Unknown backend: {self.backend}")
         
         # Define action space: normalized to [-1, 1]
         self.action_space = spaces.Box(
@@ -147,24 +247,48 @@ class RoomHeatEnv(gym.Env):
         self.action_high = 65.0  # Maximum supply temperature [°C]
 
         # Load weather and disturbances
-        self._load_disturbances(internal_gain_profile)
+        self._load_disturbances(self.internal_gain_profile)
         
         # Define observation space
         self.obs_keys = self.bldg_model.state_keys
         self.p_keys = ["T_amb", "Qdot_gains"]
+        self.p_keys_dyn = list(self.p_keys)
+        if self.method in ("6R4C", "7R5C"):
+            self.p_keys_dyn += ["Qdot_int", "Qdot_sol"]
         self.weather_forecast_steps = weather_forecast_steps
         self.observation_space = self._create_observation_space()
         
         # Episode management
-        self.days = days
         self.max_t = self._calculate_max_timesteps()
         self.random_init = random_init
         self.t = 0  # Current timestep in weather data
         self._cur_steps = 0  # Steps in current episode
         self.state = None
         self.prev_action = None
+        self._linear_param_signature = None
 
         self.reset()
+
+    def _resolve_runtime_options(self):
+        self.integrator = str(self.integrator).lower()
+        self.saveat_mode = str(self.saveat_mode).lower()
+        self.step_mode = str(self.step_mode).lower()
+        self.norm_mode = str(self.norm_mode).lower()
+        self.batch_mode = str(self.batch_mode).lower()
+
+        valid_integrators = {"auto", "diffrax", "jax_rk4", "linear"}
+        if self.integrator not in valid_integrators:
+            raise ValueError(f"Unknown integrator: {self.integrator}")
+
+        if self.integrator == "auto":
+            self.integrator = "linear" if self.method in LINEAR_METHODS else "jax_rk4"
+
+        if self.integrator == "linear":
+            if self.method not in LINEAR_METHODS:
+                raise ValueError(f"Integrator 'linear' is not available for method {self.method}")
+            self.saveat_mode = "t1"
+            self.step_mode = "fixed"
+            self.fast_cost = True
 
     def _load_disturbances(self, internal_gain_profile: str):
         """Load weather data and calculate total disturbances."""
@@ -172,11 +296,19 @@ class RoomHeatEnv(gym.Env):
         repo_root = Path(__file__).resolve().parents[2]
         
         pos = self.building["position"]
-        self.weather_data = load_weather(
-            pos["lat"], pos["long"], pos["altitude"],
-            tz=pos['timezone'],
-            repo_filepath=str(repo_root)
-        )
+        if self.city:
+            self.weather_data = load_weather_for_city(
+                self.city,
+                repo_filepath=str(repo_root),
+                allow_download=self.allow_weather_download,
+            )
+        else:
+            self.weather_data = load_weather(
+                pos["lat"], pos["long"], pos["altitude"],
+                tz=pos['timezone'],
+                repo_filepath=str(repo_root),
+                allow_download=self.allow_weather_download,
+            )
         
         # Generate internal gains
         self.internal_gains_df = get_int_gains(
@@ -197,6 +329,15 @@ class RoomHeatEnv(gym.Env):
             [self.weather_data['T_amb'], Qdot_gains],
             axis=1
         ).astype(np.float32).resample(f'{self.delta_t}s').ffill()
+        if self.method in ("6R4C", "7R5C"):
+            # Append Qdot_int and Qdot_sol for higher-order models
+            q_int = self.internal_gains_df['Qdot_tot'].rename('Qdot_int')
+            q_sol = pd.Series(Qdot_sol, index=self.weather_data.index, name='Qdot_sol')
+            self.p = pd.concat([self.p, q_int, q_sol], axis=1).astype(np.float32).resample(f'{self.delta_t}s').ffill()
+        if self.days is not None:
+            max_steps = int(self.days * 24 * (3600 / self.delta_t))
+            if max_steps > 0 and max_steps < len(self.p):
+                self.p = self.p.iloc[:max_steps]
 
     def _create_observation_space(self) -> spaces.Box:
         """Create observation space based on configuration."""
@@ -241,9 +382,7 @@ class RoomHeatEnv(gym.Env):
         
         max_t = self.days * 24 * int(3600 / self.delta_t)
         if max_t >= len(self.p):
-            raise ValueError(
-                f"Maximum timesteps ({max_t}) exceeds available data length ({len(self.p)})"
-            )
+            max_t = len(self.p) - 1
         return max_t
 
     def _sample_goal_temperature(self) -> float:
@@ -254,7 +393,7 @@ class RoomHeatEnv(gym.Env):
         temp = np.random.choice(np.linspace(min_temp, max_temp, n_steps))
         return round(float(temp), 1)
 
-    def _build_observation(self, state_dict: Dict) -> np.ndarray:
+    def _build_observation(self, state_dict: Dict):
         """Build observation vector from state dictionary."""
         obs = []
         
@@ -273,6 +412,8 @@ class RoomHeatEnv(gym.Env):
         if self.goal_based:
             obs.append(self.goal_temperature)
         
+        if self.backend == "jax" and not self.return_numpy:
+            return self.jnp.array(obs, dtype=self.jnp.float32)
         return np.array(obs, dtype=np.float32)
 
     def restore_action(self, a: np.ndarray) -> float:
@@ -318,6 +459,12 @@ class RoomHeatEnv(gym.Env):
         Returns (obs, reward, terminated, truncated, info) following Gymnasium API.
         Cost/comfort metrics are included in info.
         """
+        # Apply interval randomization
+        if self.event_manager:
+            self.env_params = self.event_manager.apply("on_interval", [self.env_params], step=self._cur_steps)[0]
+            self.building = dict(self.env_params)
+            self.bldg_model.params.update(self.building)
+
         # Get current state
         state_dict = {key: value for key, value in zip(self.obs_keys, self.state[:len(self.obs_keys)])}
         pk = self.get_cur_p()
@@ -337,12 +484,74 @@ class RoomHeatEnv(gym.Env):
             T_hp_sup_set = state_dict['T_hp_ret']
 
         # Check heat pump constraints
-        T_hp_sup_set = self.hp_model.check_hp(T_hp_sup_set, state_dict['T_hp_ret'])
+        if self.backend == "jax":
+            T_hp_sup_set = float(self.simulator.apply_hp_constraints(self.jnp.array(T_hp_sup_set),
+                                                                     self.jnp.array(state_dict['T_hp_ret']),
+                                                                     {**self.hp_params, 'mdot_hp': self.bldg_model.mdot_hp}))
+        else:
+            T_hp_sup_set = self.hp_model.check_hp(T_hp_sup_set, state_dict['T_hp_ret'])
         self.prev_action = T_hp_sup_set
 
         # Simulate one step
-        res = self.simulator.get_next_state(state_dict, T_hp_sup_set, pk)
-        next_state, costs = res['state'], res['cost']
+        if self.backend == "jax":
+            with self.jax.default_device(self.jax_device):
+                x = self.jnp.array([state_dict[k] for k in self.obs_keys], dtype=self.jnp.float32)[None, :]
+                p_vec = self.jnp.array([pk[k] for k in self.p_keys_dyn], dtype=self.jnp.float32)[None, :]
+                u = self.jnp.array([T_hp_sup_set], dtype=self.jnp.float32)
+            params = compute_derived_params(self.building)
+            params['mdot_hp'] = self.bldg_model.mdot_hp
+            with self.jax.default_device(self.jax_device):
+                params_batch = {k: self.jnp.array([v], dtype=self.jnp.float32) for k, v in params.items() if isinstance(v, (int, float))}
+                if self.simulator.integrator == "linear":
+                    linear_signature = tuple(
+                        (k, float(params_batch[k][0]))
+                        for k in sorted(params_batch.keys())
+                    )
+                    if linear_signature != self._linear_param_signature:
+                        self.simulator.prepare_linear(
+                            params_batch,
+                            state_dim=x.shape[1],
+                            p_dim=p_vec.shape[1],
+                            dtype=self.jnp.float32,
+                        )
+                        self._linear_param_signature = linear_signature
+                ys, next_state_arr = self.simulator.step(x, u, p_vec, params_batch)
+            next_state = {k: float(next_state_arr[0, i]) for i, k in enumerate(self.obs_keys)}
+            # compute operative temp for methods 6R4C and 7R5C
+            if "T_op" in self.obs_keys:
+                if "T_surf_floor" in self.obs_keys:
+                    f_floor = params['area_floor'] / params['A_surf']
+                    next_state["T_surf"] = f_floor * next_state['T_surf_floor'] + (1 - f_floor) * next_state['T_surf_wall']
+                next_state["T_op"] = 0.7 * next_state["T_room"] + 0.3 * next_state.get("T_surf", next_state.get("T_surf_wall", 0.0))
+            if self.fast_cost and self.saveat_mode == "t1":
+                T_room = next_state_arr[0, 0]
+                dev_neg = self.jnp.maximum(self.bldg_model.T_room_set_lower - T_room, 0.0)
+                dev_pos = self.jnp.maximum(T_room - self.bldg_model.T_room_set_upper, 0.0)
+                costs = {
+                    'dev_neg_sum': float(dev_neg * self.delta_t / 3600.0),
+                    'dev_neg_max': float(dev_neg),
+                    'dev_pos_sum': float(dev_pos * self.delta_t / 3600.0),
+                    'dev_pos_max': float(dev_pos),
+                }
+                T_hp_ret = next_state_arr[0, -1]
+                hp_cost = self.simulator.calc_cost(self.jnp.array([T_hp_ret]), u[0], self.jnp.array(pk['T_amb']), {**self.hp_params, 'mdot_hp': self.bldg_model.mdot_hp})
+            else:
+                # comfort deviation
+                T_room_series = ys[0, :, 0]
+                dev_neg = self.jnp.maximum(self.bldg_model.T_room_set_lower - T_room_series, 0.0)
+                dev_pos = self.jnp.maximum(T_room_series - self.bldg_model.T_room_set_upper, 0.0)
+                costs = {
+                    'dev_neg_sum': float(self.jnp.mean(dev_neg) * self.delta_t / 3600.0),
+                    'dev_neg_max': float(self.jnp.max(dev_neg)),
+                    'dev_pos_sum': float(self.jnp.mean(dev_pos) * self.delta_t / 3600.0),
+                    'dev_pos_max': float(self.jnp.max(dev_pos)),
+                }
+                T_hp_ret_series = ys[0, :, -1]
+                hp_cost = self.simulator.calc_cost(T_hp_ret_series, u[0], self.jnp.array(pk['T_amb']), {**self.hp_params, 'mdot_hp': self.bldg_model.mdot_hp})
+            costs.update({k: float(v) for k, v in hp_cost.items()})
+        else:
+            res = self.simulator.get_next_state(state_dict, T_hp_sup_set, pk)
+            next_state, costs = res['state'], res['cost']
         
         # Convert electricity use to kWh
         costs['E_el'] = costs['E_el'] / 1000
@@ -357,7 +566,8 @@ class RoomHeatEnv(gym.Env):
         
         # Check termination
         truncated = (self.t >= len(self.p) - 1 or self._cur_steps >= self.max_t)
-        
+        terminated = False
+
         # Build info dictionary
         info = {
             "cost": float(costs["dev_neg_max"]), # Reserved for SafeRL
@@ -376,17 +586,44 @@ class RoomHeatEnv(gym.Env):
         if self.cost_dim == 2:
             info["dev_sum_hourly"] = float(costs["dev_neg_sum"])
             info["comfort_violated"] = bool(costs["dev_neg_max"] > 0.01)
+
+        if self.termination_fn is not None:
+            terminated, truncated, extra = self.termination_fn(next_state, self.building, self.t, info)
+            if extra:
+                info.update(extra)
         
         # Add noise to observation
         obs = self.state.copy()
         if self.noise_level > 0:
-            obs += np.random.normal(0, self.noise_level, obs.shape)
+            if self.backend == "jax" and not self.return_numpy:
+                obs = obs + self.jax.random.normal(self.jax.random.PRNGKey(0), obs.shape) * self.noise_level
+            else:
+                obs += np.random.normal(0, self.noise_level, obs.shape)
         
-        return obs, float(reward), False, truncated, info
+        if self.backend == "jax" and self.return_numpy:
+            obs = np.array(obs)
+        return obs, float(reward), bool(terminated), bool(truncated), info
 
     def reset(self, seed=None, **kwargs):
         """Reset the environment and return the initial observation and info."""
         super().reset(seed=seed)
+
+        if self.event_manager:
+            self.env_params = self.event_manager.apply("on_reset", [self.env_params])[0]
+            self.building = dict(self.env_params)
+            self.bldg_model = Building(
+                params=self.building,
+                mdot_hp=self.env_params.get('mdot_hp', self.bldg_model.mdot_hp),
+                method=self.method
+            )
+            self.hp_model = getattr(model_hvac, self.hp_model_name)(mdot_HP=self.env_params.get('mdot_hp', self.bldg_model.mdot_hp))
+            if self.backend == "legacy":
+                self.simulator = Model_simulator(
+                    hp_model=self.hp_model,
+                    bldg_model=self.bldg_model,
+                    timestep=self.delta_t,
+                )
+            self._load_disturbances(self.internal_gain_profile)
         
         # Sample new goal temperature if goal-based
         if self.goal_based:
@@ -396,7 +633,10 @@ class RoomHeatEnv(gym.Env):
         if self.random_init:
             max_offset = max(self.weather_forecast_steps) if self.weather_forecast_steps else 0
             max_start = self.p.shape[0] - self.max_t - 1 - max_offset
-            self.t = np.random.randint(0, max_start)
+            if max_start > 0:
+                self.t = np.random.randint(0, max_start)
+            else:
+                self.t = 0
         else:
             self.t = 0
         
@@ -405,7 +645,10 @@ class RoomHeatEnv(gym.Env):
         self.prev_action = None
         self._cur_steps = 0
         
-        return self.state.copy(), {}
+        obs = self.state.copy()
+        if self.backend == "jax" and self.return_numpy:
+            obs = np.array(obs)
+        return obs, {}
     
     def _create_initial_state(self) -> np.ndarray:
         """Create initial state observation."""
@@ -427,7 +670,10 @@ class RoomHeatEnv(gym.Env):
     # Utility methods
     def get_obs(self) -> np.ndarray:
         """Return a copy of the current observation vector."""
-        return self.state.copy()
+        obs = self.state.copy()
+        if self.backend == "jax" and self.return_numpy:
+            obs = np.array(obs)
+        return obs
     
     def get_cur_T_amb(self) -> float:
         """Get current ambient temperature in degrees Celsius."""

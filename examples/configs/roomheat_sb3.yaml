@@ -1,0 +1,53 @@
+env:
+  type: room
+  hp_model: Heatpump_AW
+  building: sfh_2016_now_0_soc
+  method: 4R3C
+  mdot_HP: 0.25
+  internal_gain_profile: data/profiles/InternalGains/ResidentialDetached.csv
+  weather_forecast_steps: []
+  delta_t: 900
+  days: 30
+  random_init: true
+  backend: jax
+  device: cpu
+  return_numpy: true
+  batch_mode: stacked
+  saveat_mode: t1
+  norm_mode: max
+  fast_cost: true
+  integration_steps: 10
+  step_mode: fixed
+  integrator: auto
+  goal_based: false
+  goal_temp_range: [19.0, 28.0]
+  temp_deviation_weight: 0.0
+  noise_level: 0.0
+
+domain_randomization:
+  seed: 42
+  events:
+    - when: on_reset
+      target: mdot_hp
+      distribution: uniform
+      low: 0.22
+      high: 0.30
+    - when: on_interval
+      interval: 96
+      target: T_offset
+      distribution: normal
+      mean: 0.0
+      std: 0.5
+      clip: [-1.5, 1.5]
+
+training:
+  total_timesteps: 200000
+  seed: 0
+  logdir: runs/ppo_roomheat_yaml
+  device: auto
+  model_name: ppo_roomheat
+
+evaluation:
+  model_path: runs/ppo_roomheat_yaml/ppo_roomheat.zip
+  num_episodes: 5
+  device: auto

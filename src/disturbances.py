@@ -2,15 +2,44 @@
 # Functions to generate disturbance profiles.
 
 from pathlib import Path
+from typing import Optional, Tuple, Any
 import numpy as np
 import pandas as pd
 import pvlib
 import requests
 import json
 import random
+import yaml
 
 
-def generate_disturbances_all(building_model, year=2015, timestep=900, offset_days=0, GRID_ON=True, repo_filepath=''):
+_WEATHER_CACHE = {}
+_CITY_WEATHER_CACHE = {}
+_INT_GAINS_CACHE = {}
+_SOLAR_POS_CACHE = {}
+
+
+def _time_index_key(time) -> Tuple[Any, ...]:
+    if not isinstance(time, pd.DatetimeIndex):
+        return (None,)
+    if len(time) == 0:
+        return (0, 0, 0, None, None)
+    freq = time.freqstr or pd.infer_freq(time)
+    tz = str(time.tz) if time.tz is not None else None
+    return (int(time[0].value), int(time[-1].value), len(time), freq, tz)
+
+
+def _solar_position_key(weather_index: pd.DatetimeIndex, pos: dict) -> Tuple[Any, ...]:
+    idx_key = _time_index_key(weather_index)
+    return (
+        float(pos.get('lat', 0.0)),
+        float(pos.get('long', 0.0)),
+        float(pos.get('altitude', 0.0)),
+        str(pos.get('timezone', '')),
+        idx_key,
+    )
+
+
+def generate_disturbances_all(building_model, year=2015, timestep=900, offset_days=0, GRID_ON=True, repo_filepath='', allow_download: bool = False):
    '''
    Compose all disturbances:
    - T_amb (ambient temperature)
@@ -43,7 +72,8 @@ def generate_disturbances_all(building_model, year=2015, timestep=900, offset_da
                                  longitude = building_model.params['position']['long'],
                                  altitude  = building_model.params['position']['altitude'],
                                  year=year,
-                                 repo_filepath=repo_filepath)[0:8760]
+                                 repo_filepath=repo_filepath,
+                                 allow_download=allow_download)[0:8760]
 
    # 2. Generate absolute heat gain profiles based on datetime, building usage and floor area.
    # Profiles: Profil_HIL, ResidentialDetached
@@ -92,7 +122,7 @@ def generate_disturbances_all(building_model, year=2015, timestep=900, offset_da
    return p
 
 
-def generate_disturbances(building, year=2015, repo_filepath=''):
+def generate_disturbances(building, year=2015, repo_filepath='', allow_download: bool = False):
     '''Generate a dataframe of ambient temperature and internal/solar heat gain disturbances.
 
     Parameters
@@ -113,7 +143,8 @@ def generate_disturbances(building, year=2015, repo_filepath=''):
     pos = building.params['position']
     # Load weather data as pandas df
     weather_df = load_weather(latitude = pos['lat'], longitude = pos['long'], 
-                              altitude  = pos['altitude'], year=year, repo_filepath=repo_filepath) # Load, and then select the first week of the data
+                              altitude  = pos['altitude'], year=year, repo_filepath=repo_filepath,
+                              allow_download=allow_download) # Load, and then select the first week of the data
 
     # Generate absolute heat gain profiles based on datetime, building usage and floor area.
     profile_path = Path(repo_filepath, 'data', 'profiles', 'InternalGains', f'{building.usage}.csv')
@@ -133,7 +164,7 @@ def generate_disturbances(building, year=2015, repo_filepath=''):
 
     return p_hourly
 
-def load_weather(latitude, longitude, altitude=0, year=2015, tz='Europe/Berlin', repo_filepath=''):
+def load_weather(latitude, longitude, altitude=0, year=2015, tz='Europe/Berlin', repo_filepath='', allow_download: bool = False):
     '''
     Loads weather data, extracts ambient temperature & irradiance data and returns them in
     a pandas dataframe.
@@ -178,6 +209,11 @@ def load_weather(latitude, longitude, altitude=0, year=2015, tz='Europe/Berlin',
         - dni     : Direct normal irradiation       [W/m^2]
     '''
 
+    cache_key = (float(latitude), float(longitude), float(altitude), int(year), str(tz), str(repo_filepath))
+    cached = _WEATHER_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
     # Generate filename in the same format as it would have been downloaded from dwd
     lat_str = f'{latitude:07.4f}'.replace('.', '')
     lon_str = f'{longitude:07.4f}'.replace('.', '')
@@ -208,8 +244,14 @@ def load_weather(latitude, longitude, altitude=0, year=2015, tz='Europe/Berlin',
 
     # Otherwise load the data from PVGIS online API tool
     else:
+        if not allow_download:
+            raise RuntimeError(
+                "No local weather file found and downloads are disabled. "
+                "Pass allow_download=True or provide a city with a local weather_file."
+            )
         df = load_weather_pvgis(latitude, longitude, start_year=year, end_year=year, tz=tz, repo_filepath=repo_filepath)
 
+    _WEATHER_CACHE[cache_key] = df
     return df
 
 
@@ -411,6 +453,70 @@ def _fetch_pvgis_data(latitude, longitude, two_axis_tracking=False,
     return pd.json_normalize(data['outputs']['hourly'])
 
 
+def _load_city_registry(repo_filepath: str):
+    registry_path = Path(repo_filepath, 'data', 'cities.yaml')
+    if not registry_path.exists():
+        return {}
+    with registry_path.open('r') as f:
+        data = yaml.safe_load(f)
+    return data.get('cities', {}) if data else {}
+
+
+def load_weather_for_city(city_name: str, year: int = 2015, repo_filepath: str = '', allow_download: bool = False):
+    cache_key = (str(city_name), int(year), str(repo_filepath))
+    cached = _CITY_WEATHER_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    cities = _load_city_registry(repo_filepath)
+    if city_name not in cities:
+        raise ValueError(f"City '{city_name}' not found in city registry.")
+    c = cities[city_name]
+    weather_file = c.get('weather_file')
+    if weather_file:
+        wf_path = Path(repo_filepath, weather_file)
+        if wf_path.suffix == '.dat':
+            # Reuse DWD parsing by faking location and filename
+            raw = pd.read_table(wf_path, header=27, na_values='***', sep='\s+')
+            raw.dropna(inplace=True)
+            raw.index = pd.date_range(start=f'{year}-01-01 00:00:00', periods=len(raw), freq='h')
+            df = pd.DataFrame(index=raw.index)
+            df['T_amb'] = raw.t.values
+            df['dhi'] = raw.D.values
+            df['ghi'] = raw.B.values + raw.D.values
+            location = pvlib.location.Location(latitude=c['lat'], longitude=c['lon'],
+                                               tz=c['tz'], altitude=c.get('altitude', 0))
+            solarposition = location.get_solarposition(df.index)
+            aoi_projection = pvlib.irradiance.aoi_projection(surface_tilt=0, surface_azimuth=0,
+                                                             solar_zenith=solarposition.zenith,
+                                                             solar_azimuth=solarposition.azimuth)
+            df['dni'] = raw.B.values / np.maximum(0.05, aoi_projection)
+            _CITY_WEATHER_CACHE[cache_key] = df
+            return df
+    df = load_weather(latitude=c['lat'], longitude=c['lon'],
+                      altitude=c.get('altitude', 0), year=year, tz=c['tz'],
+                      repo_filepath=repo_filepath, allow_download=allow_download)
+    _CITY_WEATHER_CACHE[cache_key] = df
+    return df
+
+
+def register_city(name: str, lat: float, lon: float, altitude: float, tz: str,
+                  weather_file: Optional[str] = None, repo_filepath: str = ''):
+    registry_path = Path(repo_filepath, 'data', 'cities.yaml')
+    cities = _load_city_registry(repo_filepath)
+    cities[name] = {
+        'lat': float(lat),
+        'lon': float(lon),
+        'altitude': float(altitude),
+        'tz': tz,
+    }
+    if weather_file:
+        cities[name]['weather_file'] = weather_file
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    with registry_path.open('w') as f:
+        yaml.safe_dump({'cities': cities}, f, sort_keys=True)
+
+
 
 def get_random_location(country_code='DE', repo_filepath=''):
     '''
@@ -513,19 +619,25 @@ def get_solar_gains(weather, bldg_params, albedo = 0.2):
     windows = bldg_params['windows']
     pos = bldg_params['position']
 
-    for window in windows:
-
-        tilt = int(min(180, max(0, window['tilt'])))
-        azimuth = int(min(360, max(0, window['azimuth'])))
-        albedo = min(1.0, max(0.0, albedo))
-
+    cache_key = _solar_position_key(weather.index, pos)
+    cached = _SOLAR_POS_CACHE.get(cache_key)
+    if cached is None:
         location = pvlib.location.Location(latitude = pos['lat'],
                                            longitude = pos['long'],
                                            tz = pos['timezone'],
                                            altitude = pos['altitude'])
         solarposition = location.get_solarposition(weather.index)
-        airmass   = location.get_airmass(times = weather.index, solar_position = solarposition)
+        airmass = location.get_airmass(times = weather.index, solar_position = solarposition)
         dni_extra = pvlib.irradiance.get_extra_radiation(weather.index)
+        _SOLAR_POS_CACHE[cache_key] = (solarposition, airmass, dni_extra)
+    else:
+        solarposition, airmass, dni_extra = cached
+
+    for window in windows:
+
+        tilt = int(min(180, max(0, window['tilt'])))
+        azimuth = int(min(360, max(0, window['azimuth'])))
+        albedo = min(1.0, max(0.0, albedo))
         
         # Calculate plane of array irradiance
         poa = pvlib.irradiance.get_total_irradiance(surface_tilt = tilt,
@@ -578,9 +690,17 @@ def get_int_gains(time, profile_path, bldg_area = None):
         - Qdot_app         : Absolute internal gains through appliances [W]
         - Qdot_tot         : Total absolute internal gains [W]
     '''
+    cache_key = None
     # Accept str/Path or an already loaded DataFrame
     if isinstance(profile_path, (str, Path)):
-        profile = pd.read_csv(profile_path,
+        profile_path_str = str(profile_path)
+        time_key = _time_index_key(time)
+        area_key = None if bldg_area is None else float(bldg_area)
+        cache_key = (profile_path_str, area_key, time_key)
+        cached = _INT_GAINS_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
+        profile = pd.read_csv(profile_path_str,
                               delimiter = ";",
                               index_col = "hour")
     else:
@@ -609,6 +729,8 @@ def get_int_gains(time, profile_path, bldg_area = None):
         df["Qdot_app"] = df["qdot_app"] * bldg_area
         df["Qdot_tot"] = df["qdot_tot"] * bldg_area
 
+    if cache_key is not None:
+        _INT_GAINS_CACHE[cache_key] = df
     return df
 
 
