@@ -41,7 +41,7 @@ class RoomHeatEnv(gym.Env):
         method: str,
         mdot_HP: float,
         internal_gain_profile: str,
-        weather_forecast_steps: List[int] = [],
+        weather_forecast_steps: Optional[List[int]] = None,
         # Simulation parameters
         delta_t: int = 900,
         days: int = None,
@@ -68,12 +68,6 @@ class RoomHeatEnv(gym.Env):
         temp_deviation_weight: float = 0.0,
         # Observation noise
         noise_level: float = 0.0,
-        # Legacy parameters (kept for compatibility)
-        grid_profile: str = None,
-        cost_dim: int = 1,
-        action_deviation_factor: float = 10,
-        dev_sum_weight: float = 100,
-        dev_max_weight: float = 100,
     ):
         """Initialize the RoomHeatEnv.
 
@@ -92,7 +86,7 @@ class RoomHeatEnv(gym.Env):
         weather_forecast_steps : List[int]
             Steps ahead (in multiples of delta_t) to append T_amb forecasts.
         delta_t : int
-            Sampling interval in seconds (default: 3600).
+            Sampling interval in seconds (default: 900).
         days : int
             Episode length in days. If None, uses full available length.
         random_init : bool
@@ -119,40 +113,13 @@ class RoomHeatEnv(gym.Env):
             Integration step mode ("adaptive" or "fixed").
         integrator : str
             Integration backend ("diffrax" or "jax_rk4").
-        grid_profile : str
-            Deprecated. Has no effect; kept for backward compatibility.
-        cost_dim : int
-            Deprecated. Has no effect; kept for backward compatibility.
-        action_deviation_factor : float
-            Deprecated. Has no effect; kept for backward compatibility.
-        dev_sum_weight : float
-            Deprecated. Has no effect; kept for backward compatibility.
-        dev_max_weight : float
-            Deprecated. Has no effect; kept for backward compatibility.
         """
-        import warnings
-        _legacy = {
-            "grid_profile": grid_profile,
-            "cost_dim": cost_dim if cost_dim != 1 else None,
-            "action_deviation_factor": action_deviation_factor if action_deviation_factor != 10 else None,
-            "dev_sum_weight": dev_sum_weight if dev_sum_weight != 100 else None,
-            "dev_max_weight": dev_max_weight if dev_max_weight != 100 else None,
-        }
-        _active_legacy = [k for k, v in _legacy.items() if v is not None]
-        if _active_legacy:
-            warnings.warn(
-                f"RoomHeatEnv received deprecated parameters {_active_legacy} which have no effect. "
-                "They will be removed in a future version.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
         super(RoomHeatEnv, self).__init__()
 
         # Core simulation parameters
         self.delta_t = delta_t  # Store internally as timestep for compatibility
         self.days = days
         self.method = method
-        self.cost_dim = cost_dim
         self.noise_level = noise_level
         self.backend = backend
         self.device = device
@@ -183,7 +150,6 @@ class RoomHeatEnv(gym.Env):
         if building not in BUILDING_NAMES2CLASS.keys():
             raise ValueError(f"Building {building} not in the list of available buildings")
         
-        print(f"Building {building} is selected")
         self.building = BUILDING_NAMES2CLASS[building]
         self.env_params = dict(self.building)
         self.env_params['mdot_hp'] = mdot_HP
@@ -255,7 +221,7 @@ class RoomHeatEnv(gym.Env):
         self.p_keys_dyn = list(self.p_keys)
         if self.method in ("6R4C", "7R5C"):
             self.p_keys_dyn += ["Qdot_int", "Qdot_sol"]
-        self.weather_forecast_steps = weather_forecast_steps
+        self.weather_forecast_steps = weather_forecast_steps or []
         self.observation_space = self._create_observation_space()
         
         # Episode management
@@ -266,6 +232,7 @@ class RoomHeatEnv(gym.Env):
         self.state = None
         self.prev_action = None
         self._linear_param_signature = None
+        self._noise_rng_key = None
 
         self.reset()
 
@@ -357,15 +324,11 @@ class RoomHeatEnv(gym.Env):
         
         # Weather forecast
         if len(self.weather_forecast_steps) > 0:
-            print(f"Enabling Weather Forecast: {len(self.weather_forecast_steps)} steps")
             obs_low.extend([OBSERVATION_SPACE_LIMIT['T_amb'][0]] * len(self.weather_forecast_steps))
             obs_high.extend([OBSERVATION_SPACE_LIMIT['T_amb'][1]] * len(self.weather_forecast_steps))
-        else:
-            print("Disabling Weather Forecast")
-        
+
         # Goal temperature (if goal-based)
         if self.goal_based:
-            print("Enabling Goal-Based Mode")
             obs_low.append(self.goal_temp_range[0])
             obs_high.append(self.goal_temp_range[1])
         
@@ -582,10 +545,6 @@ class RoomHeatEnv(gym.Env):
         if self.goal_based:
             info["goal_temperature"] = float(self.goal_temperature)
             info["temp_deviation"] = float(abs(next_state['T_room'] - self.goal_temperature))
-        
-        if self.cost_dim == 2:
-            info["dev_sum_hourly"] = float(costs["dev_neg_sum"])
-            info["comfort_violated"] = bool(costs["dev_neg_max"] > 0.01)
 
         if self.termination_fn is not None:
             terminated, truncated, extra = self.termination_fn(next_state, self.building, self.t, info)
@@ -596,7 +555,8 @@ class RoomHeatEnv(gym.Env):
         obs = self.state.copy()
         if self.noise_level > 0:
             if self.backend == "jax" and not self.return_numpy:
-                obs = obs + self.jax.random.normal(self.jax.random.PRNGKey(0), obs.shape) * self.noise_level
+                self._noise_rng_key, subkey = self.jax.random.split(self._noise_rng_key)
+                obs = obs + self.jax.random.normal(subkey, obs.shape) * self.noise_level
             else:
                 obs += np.random.normal(0, self.noise_level, obs.shape)
         
@@ -644,6 +604,9 @@ class RoomHeatEnv(gym.Env):
         self.state = self._create_initial_state()
         self.prev_action = None
         self._cur_steps = 0
+        if self.backend == "jax" and self.noise_level > 0:
+            noise_seed = seed if seed is not None else 0
+            self._noise_rng_key = self.jax.random.PRNGKey(noise_seed)
         
         obs = self.state.copy()
         if self.backend == "jax" and self.return_numpy:

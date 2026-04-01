@@ -340,7 +340,7 @@ class RoomHeatVecEnv(gym.vector.VectorEnv):
             d['mdot_hp'] = self.env_params[i].get('mdot_hp', self.hp_params['mdot_hp'])
             d['cop_scale'] = self.env_params[i].get('cop_scale', 1.0)
             d['T_room_set_lower'] = self.env_params[i].get('T_room_set_lower', 20.0)
-            d['T_room_set_upper'] = self.env_params[i].get('T_room_set_upper', 26.0)
+            d['T_room_set_upper'] = self.env_params[i].get('T_room_set_upper', 22.0)
         self.params = stack_params(derived)
         with self.jax.default_device(self.jax_device):
             self.params = {k: self.jnp.array(v) for k, v in self.params.items()}
@@ -402,7 +402,7 @@ class RoomHeatVecEnv(gym.vector.VectorEnv):
 
             T_hp_sup_set = self.jnp.where(
                 T_amb < params['T_amb_lim'],
-                T_hp_sup_set + params['T_offset'],
+                T_hp_sup_set,
                 T_hp_ret,
             )
             T_hp_sup_set = self.simulator.apply_hp_constraints(T_hp_sup_set, T_hp_ret, params)
@@ -696,29 +696,106 @@ class RoomHeatVecEnv(gym.vector.VectorEnv):
 
     def _build_auto_reset_fn(self):
         """Build a JIT-compiled masked reset that stays entirely on device."""
-        init_temp = 20.0
         n_obs = len(self.obs_keys)
+        max_t = self.p_arr.shape[0] - 1
 
         @self.jax.jit
-        def _masked_reset(state, t, done):
-            init_state = self.jnp.full((self.num_envs, n_obs), init_temp, dtype=state.dtype)
+        def _masked_reset(state, t, cur_steps, done, init_temps, start_times):
+            # Per-env randomized initial temperature and start time.
+            init_state = self.jnp.broadcast_to(
+                init_temps[:, None], (self.num_envs, n_obs)
+            )
             new_state = self.jnp.where(done[:, None], init_state, state)
-            new_t = self.jnp.where(done, self.jnp.zeros_like(t), t)
-            return new_state, new_t
+            # Clamp start times to valid range.
+            clamped_t = self.jnp.clip(start_times, 0, max_t)
+            new_t = self.jnp.where(done, clamped_t, t)
+            new_cur_steps = self.jnp.where(
+                done, self.jnp.zeros_like(cur_steps), cur_steps
+            )
+            return new_state, new_t, new_cur_steps
 
         self._auto_reset_fn = _masked_reset
 
     def auto_reset(self, done):
-        """Reset only the environments where done[i] is True, entirely on device.
+        """Reset done environments with domain randomization.
 
-        No parameter rebuild, no disturbance reload, no JIT recompile.
-        Suitable for use inside a training loop after env.step() returns truncated/terminated.
+        Applies ``on_reset`` events to randomize building parameters for the
+        done environments, then resets their state with randomized initial
+        temperature and start time on device.
 
         Args:
             done: bool array of shape (num_envs,) — True for envs to reset.
         """
         done_j = self.jnp.asarray(done, dtype=bool)
-        self.state, self.t = self._auto_reset_fn(self.state, self.t, done_j)
+        done_np = np.asarray(done_j)
+        done_indices = np.where(done_np)[0]
+
+        if len(done_indices) == 0:
+            return
+
+        # --- Apply domain randomization for done envs ---
+        if self.event_manager:
+            done_params = [self.env_params[i] for i in done_indices]
+            updated, changed = self.event_manager.apply_inplace(
+                "on_reset", done_params
+            )
+            if changed:
+                for j, i in enumerate(done_indices):
+                    self.env_params[i] = updated[j]
+                # Rebuild param arrays and update JAX params for changed envs.
+                self._rebuild_params_for_envs(done_indices)
+
+        # --- Randomized initial temperature and start time ---
+        rng = self.event_manager.rng if self.event_manager else np.random.default_rng()
+        init_temps_np = np.full(self.num_envs, 20.0, dtype=np.float32)
+        start_times_np = np.zeros(self.num_envs, dtype=np.int32)
+        # Randomize only the done envs.
+        n_done = len(done_indices)
+        init_temps_np[done_indices] = rng.uniform(15.0, 25.0, size=n_done).astype(
+            np.float32
+        )
+        max_t = int(self.p_arr.shape[0]) - 1
+        if max_t > 0:
+            start_times_np[done_indices] = rng.integers(
+                0, max_t, size=n_done
+            ).astype(np.int32)
+
+        with self.jax.default_device(self.jax_device):
+            init_temps_j = self.jnp.array(init_temps_np)
+            start_times_j = self.jnp.array(start_times_np)
+
+        self.state, self.t, self._cur_steps = self._auto_reset_fn(
+            self.state, self.t, self._cur_steps, done_j, init_temps_j, start_times_j
+        )
+
+    def _rebuild_params_for_envs(self, indices):
+        """Rebuild JAX param arrays after DR changed specific env params.
+
+        Recomputes derived params for the given env indices and updates
+        the corresponding rows in the JAX param dict in-place.
+        """
+        # Build updated numpy arrays from current params, patch changed envs.
+        updated_arrays = {k: np.array(v, copy=True) for k, v in self.params.items()}
+        for i in indices:
+            d = compute_derived_params(self.env_params[i])
+            d['mdot_hp'] = self.env_params[i].get('mdot_hp', self.hp_params['mdot_hp'])
+            d['cop_scale'] = self.env_params[i].get('cop_scale', 1.0)
+            d['T_room_set_lower'] = self.env_params[i].get('T_room_set_lower', 20.0)
+            d['T_room_set_upper'] = self.env_params[i].get('T_room_set_upper', 22.0)
+            for key, val in d.items():
+                if key in updated_arrays:
+                    updated_arrays[key][i] = val
+        with self.jax.default_device(self.jax_device):
+            self.params = {k: self.jnp.array(v) for k, v in updated_arrays.items()}
+
+        # Rebuild linear mats if using linear integrator.
+        if self.integrator == "linear":
+            self.simulator.prepare_linear(
+                self.params,
+                state_dim=len(self.obs_keys),
+                p_dim=len(self.p_keys_dyn),
+                dtype=self.jnp.float32,
+            )
 
     def _to_action_tensor(self, actions):
         actions_j = self.jnp.asarray(actions, dtype=self.jnp.float32)
@@ -786,12 +863,12 @@ class RoomHeatVecEnv(gym.vector.VectorEnv):
                 cur_steps_seq = self._cur_steps[None, :] + step_ids
                 truncated = (t_seq >= self.p_arr.shape[0] - 1) | (cur_steps_seq >= (self.p_arr.shape[0] - 1))
                 terminated = self.jnp.zeros((self.steps_per_call, self.num_envs), dtype=bool)
-                info = {"dev_sum": dev_neg_sum, "dev_max": dev_neg_max, "Q_el_kWh": E_el}
+                info = {"dev_sum": dev_neg_sum + dev_pos_sum, "dev_max": self.jnp.maximum(dev_neg_max, dev_pos_max), "Q_el_kWh": E_el}
             else:
                 cur_steps_next = self._cur_steps + self.steps_per_call
                 truncated = (next_t >= self.p_arr.shape[0] - 1) | (cur_steps_next >= (self.p_arr.shape[0] - 1))
                 terminated = self.jnp.zeros((self.num_envs,), dtype=bool)
-                info = {"dev_sum": dev_neg_sum, "dev_max": dev_neg_max, "Q_el_kWh": E_el}
+                info = {"dev_sum": dev_neg_sum + dev_pos_sum, "dev_max": self.jnp.maximum(dev_neg_max, dev_pos_max), "Q_el_kWh": E_el}
 
             self.t = next_t
             self._cur_steps = self._cur_steps + self.steps_per_call

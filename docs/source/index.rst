@@ -29,6 +29,7 @@ A simple rule based heating curve controller can be used as the reference case a
    disturbances
    controller
    simulator
+   domain_randomization
 
 
 Roadmap

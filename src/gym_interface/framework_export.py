@@ -31,8 +31,9 @@ def jax_to_torch(arr, device=None):
         ImportError: if ``torch`` or ``jax`` are not installed.
     """
     import torch
-    import jax.dlpack
-    t = torch.utils.dlpack.from_dlpack(jax.dlpack.to_dlpack(arr))
+    # Use the modern __dlpack__ protocol (JAX ≥0.4, PyTorch ≥1.10).
+    # This avoids the legacy jax.dlpack path which requires a CPU backend.
+    t = torch.from_dlpack(arr)
     if device is not None:
         t = t.to(device)
     return t
@@ -51,8 +52,7 @@ def jax_to_tf(arr):
         ImportError: if ``tensorflow`` or ``jax`` are not installed.
     """
     import tensorflow as tf
-    import jax.dlpack
-    return tf.experimental.dlpack.from_dlpack(jax.dlpack.to_dlpack(arr))
+    return tf.experimental.dlpack.from_dlpack(arr)
 
 
 def jax_to_cupy(arr):
@@ -68,5 +68,4 @@ def jax_to_cupy(arr):
         ImportError: if ``cupy`` or ``jax`` are not installed.
     """
     import cupy
-    import jax.dlpack
-    return cupy.from_dlpack(jax.dlpack.to_dlpack(arr))
+    return cupy.from_dlpack(arr)

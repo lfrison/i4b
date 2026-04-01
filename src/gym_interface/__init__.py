@@ -64,7 +64,7 @@ def make_env_id(
 
 def register_room_heat_env(
     env_id: str,
-    entry_point: str = "gym_interface.room_env:RoomHeatEnv",
+    entry_point: str = "src.gym_interface.room_env:RoomHeatEnv",
     **kwargs,
 ):
     """Register RoomHeatEnv with Gymnasium if not already present.
