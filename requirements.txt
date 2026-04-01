@@ -1,12 +1,13 @@
-casadi==3.7.2
-pvlib==0.13.1
 numpy==2.2.6
 pandas==2.3.3
 gymnasium==1.2.1
 scipy==1.15.0
 matplotlib==3.10.7
+pvlib==0.13.1
+PyYAML==6.0.2
 jax==0.6.2
 jaxlib==0.6.2
 diffrax==0.7.0
-equinox==0.10.10
-PyYAML==6.0.2
+
+# Optional: MPC controller (not required for gym_interface or RL training)
+# casadi==3.7.2

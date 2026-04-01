@@ -1,4 +1,3 @@
+torch==2.9.1
+tensorboard==2.20.0
 stable-baselines3==2.7.0
-torch==2.9.0
-tensorboard
-
