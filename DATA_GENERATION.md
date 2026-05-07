@@ -35,6 +35,16 @@ Available bundled buildings:
 
 Each building contains envelope parameters, floor area, room height, window orientation/area, heating-curve offsets, and a default location.
 
+### Different Building Models
+
+The thermal building models are reduced RC networks. The short names indicate the number of thermal resistances (`R`) and thermal capacities (`C`).
+
+- `2R2C`: simplest model, small state space, useful for fast experiments
+- `4R3C`: medium model depth, separates room, wall, and return-side dynamics more clearly
+- `5R4C`, `6R4C`, `7R5C`: higher-order models with more internal states and more detailed thermal dynamics (only for academia)
+
+In practice: more `R/C` elements mean more states, more parameters, and usually more detailed dynamics, but also a heavier model.
+
 ### Locations And Weather Years
 
 Use `src.disturbances.load_weather(latitude, longitude, altitude, year, tz, repo_filepath)`.
@@ -66,7 +76,7 @@ Disturbance profiles in `data/profiles/InternalGains/` for occupancy and applian
 
 The helper `src.disturbances.get_int_gains(...)` scales the selected profile by building floor area.
 
-### Saved Building Data Columns
+### Saved Building Data File
 
 A generated building data file contains simulated building states/sensors. The exact state columns depend on the RC model, for example:
 

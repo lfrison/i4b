@@ -16,14 +16,15 @@ This Python project facilitates the quick generation of reduced order building m
 1. [Install Dependencies](#install-dependencies)
 2. [Building Model](#building-models)
 3. [Disturbances](#disturbances)
-4. [Controller](#controller)
-5. [Model Predictive Control (MPC)](#model-predictive-control-mpc)
-6. [Gymnasium Interface (RL)](#gymnasium-interface-rl)
-7. [Training with Stable-Baselines3](#training-with-stable-baselines3)
-8. [Using Saferl with i4b (Safe RL)](#using-saferl-with-i4b-safe-rl)
-9. [Evaluation](#evaluation)
-10. [License](#license)
-11. [Acknowledgements](#acknowledgements)
+4. [Building Data Generation](#data-generation)
+5. [Controller](#controller)
+6. [Model Predictive Control (MPC)](#model-predictive-control-mpc)
+7. [Gymnasium Interface (RL)](#gymnasium-interface-rl)
+8. [Training with Stable-Baselines3](#training-with-stable-baselines3)
+9. [Using Saferl with i4b (Safe RL)](#using-saferl-with-i4b-safe-rl)
+10. [Evaluation](#evaluation)
+11. [License](#license)
+12. [Acknowledgements](#acknowledgements)
 
 ## Install Dependencies
 
@@ -89,6 +90,19 @@ Functions are provided to generate disturbance profiles for:
 These functions generate `pandas` dataframes, where the columns correspond to individual disturbances, and the index is a `pandas.DatetimeIndex`.
 
 To manually generate disturbance profiles, start with the weather data and give each entry a `pandas.DatetimeIndex`. The datetime index is required to generate the internal and solar heat gain profiles. For the solar heat gain profiles, the weather dataframe should also contain information about solar irradiation.
+
+For a data-generation workflow across buildings, locations, years, internal gain profiles, date ranges, and building-data CSV files, see [`DATA_GENERATION.md`](DATA_GENERATION.md) and `notebooks/DataGeneration.ipynb`.
+
+## Data Generation
+
+The repo can also be used to generate synthetic building datasets that combine:
+
+- building parameters from `data/buildings/`
+- weather and disturbance generation from `src/disturbances.py`
+- internal gain profiles from `data/profiles/InternalGains/`
+- simulated building state and heat-pump data from `src/simulator.py`
+
+Use [`DATA_GENERATION.md`](DATA_GENERATION.md) as the main entry point. The companion notebook is `notebooks/DataGeneration.ipynb`, and the reusable helper functions live in `src/data_generation.py`.
 
 ## Controller
 

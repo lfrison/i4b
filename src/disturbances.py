@@ -138,7 +138,8 @@ def load_weather(latitude, longitude, altitude=0, year=2015, tz='Europe/Berlin',
     Loads weather data, extracts ambient temperature & irradiance data and returns them in
     a pandas dataframe.
     
-    If a DWD weather file exists for the given location, this file is used. Otherwise, PVGIS online data is used.
+    If a local DWD TRY2015 weather file exists for the given location and
+    year=2015 is requested, this file is used. Otherwise, PVGIS data is used.
     
     An example DWD weather file for a location close to Freiburg can be found in the data/weather/ directory.
     Custom DWD weather files can be downloaded at: https://kunden.dwd.de/obt/.
@@ -184,8 +185,10 @@ def load_weather(latitude, longitude, altitude=0, year=2015, tz='Europe/Berlin',
     dwd_filename = f'TRY2015_{lat_str}{lon_str}_Jahr.dat'
     dwd_filepath = Path(repo_filepath, 'data', 'weather', dwd_filename)
 
-    # If a dwd file for the given location exists, process it
-    if dwd_filepath.exists():
+    # The tracked local DWD file is a TRY2015 dataset. Reusing it for arbitrary
+    # years would only relabel the datetime index while keeping identical
+    # weather values, so non-2015 requests fall through to PVGIS.
+    if dwd_filepath.exists() and year == 2015:
 
         raw = pd.read_table(dwd_filepath, header=27, na_values='***', sep='\s+')
         raw.dropna(inplace=True)
@@ -206,7 +209,7 @@ def load_weather(latitude, longitude, altitude=0, year=2015, tz='Europe/Berlin',
                                                          solar_azimuth=solarposition.azimuth)
         df['dni'] = raw.B.values / np.maximum(0.05, aoi_projection)
 
-    # Otherwise load the data from PVGIS online API tool
+    # Otherwise load the data from the PVGIS online API/cache.
     else:
         df = load_weather_pvgis(latitude, longitude, start_year=year, end_year=year, tz=tz, repo_filepath=repo_filepath)
 
@@ -266,6 +269,8 @@ def load_weather_pvgis(latitude, longitude, start_year=2015, end_year=2015,
     # Fetch base horizontal irradiation data from PVGIS seriescalc tool
     df = _fetch_pvgis_data(latitude, longitude, start_year=start_year, end_year=end_year,
                            repo_filepath=repo_filepath)
+    if df is None:
+        return None
 
     # Create time index (timezone-aware with UTC)
     df['time'] = pd.to_datetime(df.pop('time'), format='%Y%m%d:%H%M')
