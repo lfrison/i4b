@@ -8,7 +8,7 @@ import src.controller.mpc.optimization_problem as optimization_problem
 
 class MPC_solver:
       
-   def __init__(self,resultdir,resultfile,hp_model,building_model,nx=4,nu=1,npar=5,ns=1,nc=3,h = 900,nk = 96,ws=1):
+   def __init__(self,resultdir,resultfile,hp_model,building_model,nx=4,nu=1,npar=5,ns=1,nc=3,h = 900,nk = 96,ws=1,chance_epsilon=None,soft_lower_constraint=False):
       self.resultdir = resultdir
       self.resultfile = resultfile
         
@@ -19,7 +19,10 @@ class MPC_solver:
       self.dim = {'d':3,'nx':nx,'nxa':0,'nu':nu,'np':5,'ns':ns,'npar':npar,'nc':nc} 
 
       # Create instance of optimization problem class
-      self.OP = optimization_problem.optimization_problem(self.dim,hp_model,building_model,ws)
+      # Forward optional extensions such as chance constraints without changing
+      # the call sites that still use the original deterministic solver path.
+      self.OP = optimization_problem.optimization_problem(self.dim,hp_model,building_model,ws,chance_epsilon=chance_epsilon,soft_lower_constraint=soft_lower_constraint)
+      self.dim["nc"] = len(self.OP.constraint_array)
       self.hp_model = hp_model
       self.building_model = building_model
                
@@ -94,6 +97,7 @@ class MPC_solver:
       # Bounds and initial guess
       u_min, u_max, u_init = self.OP.bounds_controls
       x_min, x_max, x_init = self.OP.bounds_states 
+      s_min, s_max, s_init = self.OP.bounds_slacks(dim['ns'])
       
       # Dimensions
       NX = self.nk*(dim['d']+1)*dim['nx']+dim['nx'] # Collocated states
@@ -125,11 +129,12 @@ class MPC_solver:
             self.vars_ub[offset:offset+dim['nx']] = x_max
             offset += dim['nx']
             
-            # Slack variable
+            # Slack bounds now come from the optimization problem so lifted/PCE
+            # models can keep their own hard/soft-constraint conventions.
             self.S[k,j] = self.V[offset:offset+dim['ns']]
-            self.vars_init[offset:offset+dim['ns']] = [0 for i in range(dim['ns'])]
-            self.vars_lb[offset:offset+dim['ns']] = [0 for i in range(dim['ns'])]
-            self.vars_ub[offset:offset+dim['ns']] = [np.inf for i in range(dim['ns'])]
+            self.vars_init[offset:offset+dim['ns']] = s_init
+            self.vars_lb[offset:offset+dim['ns']] = s_min
+            self.vars_ub[offset:offset+dim['ns']] = s_max
             offset+=dim['ns']
    
          # Parametrized controls
@@ -148,9 +153,9 @@ class MPC_solver:
    
       # Slack variable at end time
       self.S[self.nk,0] = self.V[offset:offset+dim['ns']]
-      self.vars_lb[offset:offset+dim['ns']] = [0 for i in range(dim['ns'])]
-      self.vars_ub[offset:offset+dim['ns']] = [np.inf for i in range(dim['ns'])]
-      self.vars_init[offset:offset+dim['ns']] = [0 for i in range(dim['ns'])]
+      self.vars_lb[offset:offset+dim['ns']] = s_min
+      self.vars_ub[offset:offset+dim['ns']] = s_max
+      self.vars_init[offset:offset+dim['ns']] = s_init
       offset+=dim['ns']
       
       

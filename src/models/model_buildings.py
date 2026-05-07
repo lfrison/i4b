@@ -693,6 +693,28 @@ class Building:
         else:
             print("Casadi calculation method does not exist")       
 
+    # MPC helpers keep the default building model compatible with the generic
+    # optimization_problem hooks and the intrusive/PCE controller utilities.
+    def return_temperature_expr(self, x):
+        return x[-1]
+
+    def lower_comfort_constraint_expr(self, x, p, s, epsilon=None):
+        if epsilon is not None:
+            raise AttributeError("Chance constraints require a model-specific lower comfort constraint.")
+        T_room = x[0]
+        T_set_low = p[-2]
+        return T_room - T_set_low + s[0]
+
+    def control_bounds(self):
+        return [0], [65.0], [35.0]
+
+    def state_bounds(self):
+        nx = len(self.state_keys)
+        x_min = [0.0 for i in range(nx)]
+        x_max = [100.0 for i in range(nx)]
+        x_init = [35.0 for i in range(nx)]
+        return x_min, x_max, x_init
+
     def calc_2r2c_casadi(self, x, u, p):
         ''' This function contains the same building model as the fuction calc_2r2c.
         Here the casadi framework is used to use this model in a MPC controller.
