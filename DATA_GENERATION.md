@@ -76,6 +76,39 @@ Disturbance profiles in `data/profiles/InternalGains/` for occupancy and applian
 
 The helper `src.disturbances.get_int_gains(...)` scales the selected profile by building floor area.
 
+### Controllers
+
+`ctrl_method` selects what produces the heat-pump supply temperature `T_hp_sup`. Extra keyword arguments of `generate_building_data_file` are forwarded to `Model_simulator.simulate`:
+
+- `"heatcurve"` (default): feed-forward heating curve, `T_hp_sup` is a function of `T_amb` only. Keywords: `T_room_set` [degC], `shift` [K] on the heating limit temperature, `offset` [K] on the nominal supply/return temperatures.
+- `"pid"`: feedback PI(D) on the room temperature. Keywords: `T_room_set` [degC], `KP`, `KI`, `KD`.
+
+Both controller outputs then pass through the building's heating-system parameters in `src/simulator.py`:
+
+```text
+T_hp_sup = max(u + T_offset, T_hp_ret)     while T_amb < T_amb_lim
+```
+
+followed by `Heatpump.check_hp`, which clips the request to the heat-pump power range.
+
+`building_overrides` changes those building-side parameters for one run without editing `data/buildings/`:
+
+```python
+dg.generate_building_data_file(
+    ...,
+    ctrl_method="heatcurve",
+    building_overrides={"T_offset": 1.0, "mdot_hp": 0.25},
+    T_room_set=20.0, shift=0.0, offset=0.0,
+)
+```
+
+Two effects to be aware of when a generated trajectory looks wrong:
+
+- **`T_offset` sets the level of the heating curve.** Most catalog values undersupply the current models: with `sfh_1984_1994_1_enev` (`T_offset = -5`) the room settles at ~16 degC, about 3 K below the comfort bound. `src.controller.heatcurve.heatcurve.tune_building_t_offset_and_mdot_hp` re-tunes it (it suggests `+1` K for that building, which gives ~20 degC).
+- **The heat pump has a minimum power** (`Q_HP_min = 2000` W in `Heatpump.check_hp`) and no hysteresis or minimum runtime. The corresponding minimum temperature lift is `Q_HP_min / (mdot_hp * c_water)`, about 2 K. When the controller setpoint sits inside that band above `T_hp_ret`, the heat pump alternates between off and exactly 2 kW at every timestep; that is the fast oscillation seen in undersupplied runs, not a solver artifact.
+
+The controller settings and the resolved `T_offset` / `mdot_hp` are stored in the metadata JSON of each run.
+
 ### Saved Building Data File
 
 A generated building data file contains simulated building states/sensors. The exact state columns depend on the RC model, for example:

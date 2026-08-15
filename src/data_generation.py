@@ -246,9 +246,18 @@ def generate_building_data_file(
     output_dir: str | Path = "data/generated/building_data",
     locations: dict[str, dict | None] | None = None,
     repo_filepath: str | Path = "",
+    building_overrides: dict | None = None,
     **controller_kwargs,
 ) -> tuple[Path, Path, pd.DataFrame, dict, dict]:
-    """Generate and save one building-data CSV plus metadata JSON."""
+    """Generate and save one building-data CSV plus metadata JSON.
+
+    ``building_overrides`` replaces entries of the catalog building dictionary
+    before the model is built, e.g. ``{"T_offset": 1.0, "mdot_hp": 0.25}`` to
+    re-tune the heating-system parameters of the heating-curve controller.
+    ``controller_kwargs`` are forwarded to ``Model_simulator.simulate``:
+    ``T_room_set``, ``shift`` and ``offset`` for ``ctrl_method="heatcurve"``,
+    ``T_room_set`` and ``KP``/``KI``/``KD`` for ``ctrl_method="pid"``.
+    """
     repo_path = Path(repo_filepath)
     output_path = Path(output_dir)
     if not output_path.is_absolute():
@@ -257,6 +266,16 @@ def generate_building_data_file(
 
     usage = Path(profile_name).stem
     params = copy.deepcopy(getattr(building_catalog, building_name))
+    if building_overrides:
+        # Heating-system keys are optional in the catalog (i4c has no mdot_hp,
+        # for example), so they may be set even when the dictionary lacks them.
+        allowed = set(params) | {"T_offset", "T_amb_lim", "mdot_hp"}
+        unknown = set(building_overrides) - allowed
+        if unknown:
+            raise KeyError(
+                f"Unknown building parameter(s) for {building_name}: {sorted(unknown)}"
+            )
+        params.update(copy.deepcopy(building_overrides))
     location_name, resolved_location = resolve_location(
         location=location,
         locations=locations,
@@ -329,6 +348,10 @@ def generate_building_data_file(
         ),
         "initial_temperature": initial_temperature,
         "night_setback": night_setback,
+        "controller_kwargs": dict(controller_kwargs),
+        "building_overrides": dict(building_overrides or {}),
+        "T_offset": building.params.get("T_offset"),
+        "mdot_hp": building.mdot_hp,
         "columns": list(dataset.columns),
         "rows": int(len(dataset)),
         "first_row": str(dataset.index[0]),
